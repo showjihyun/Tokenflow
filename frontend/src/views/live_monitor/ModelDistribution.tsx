@@ -4,10 +4,11 @@ import { api } from "../../api/client";
 import { Badge } from "../../components/Badge";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { fmt } from "../../lib/fmt";
+import { queryKeys } from "../../lib/queryKeys";
 
 export function ModelDistribution() {
-  const { data } = useQuery({ queryKey: ["kpi-models"], queryFn: () => api.kpiModels() });
-  const { data: budget } = useQuery({ queryKey: ["kpi-budget"], queryFn: () => api.kpiBudget() });
+  const { data } = useQuery({ queryKey: queryKeys.kpiModels, queryFn: () => api.kpiModels() });
+  const { data: budget } = useQuery({ queryKey: queryKeys.kpiBudget, queryFn: () => api.kpiBudget() });
 
   return (
     <Card>

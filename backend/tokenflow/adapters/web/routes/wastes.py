@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -42,6 +43,37 @@ def _claude_md_preview(waste: dict[str, Any]) -> dict[str, Any] | None:
         "title": f"Append {kind} guidance",
         "diff": "\n".join(["--- CLAUDE.md", "+++ CLAUDE.md", "@@", *[f"+{line}" for line in lines]]),
     }
+
+
+def _added_lines_from_diff(diff: str) -> list[str]:
+    lines: list[str] = []
+    for line in diff.splitlines():
+        if line.startswith("+") and not line.startswith("+++"):
+            lines.append(line[1:])
+    return lines
+
+
+def _session_cwd(repo: Repository, session_id: str | None) -> Path | None:
+    if not session_id:
+        return None
+    rows = repo._q(
+        """
+        SELECT json_extract_string(payload, '$.cwd')
+        FROM events
+        WHERE session_id = ?
+          AND json_extract_string(payload, '$.cwd') IS NOT NULL
+        ORDER BY ts ASC
+        LIMIT 1
+        """,
+        (session_id,),
+    )
+    if not rows or not rows[0][0]:
+        return None
+    try:
+        path = Path(str(rows[0][0])).expanduser().resolve()
+    except OSError:
+        return None
+    return path if path.exists() and path.is_dir() else None
 
 
 @router.get("/wastes")
@@ -95,6 +127,32 @@ async def apply(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str
         outcome = "claude-md-snippet-proposed"
     repo.mark_waste_applied(waste_id, outcome)
     return {"ok": True, "outcome": outcome, "preview": preview}
+
+
+@router.post("/wastes/{waste_id}/apply-confirm")
+async def apply_confirm(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+    waste = repo.get_waste(waste_id)
+    if not waste:
+        raise HTTPException(404)
+    preview = _claude_md_preview(waste)
+    if not preview:
+        return {"ok": True, "applied": False, "reason": "no-file-preview"}
+    cwd = _session_cwd(repo, waste.get("session_id"))
+    if cwd is None:
+        raise HTTPException(409, "session cwd is unavailable")
+    target = (cwd / "CLAUDE.md").resolve()
+    if cwd not in target.parents and target != cwd:
+        raise HTTPException(400, "target path escaped project")
+    lines = _added_lines_from_diff(str(preview["diff"]))
+    if not lines:
+        raise HTTPException(400, "empty preview")
+    block = "\n".join(lines).strip()
+    existing = target.read_text(encoding="utf-8") if target.exists() else ""
+    if block in existing:
+        return {"ok": True, "applied": False, "path": str(target), "reason": "already-present"}
+    prefix = "\n\n" if existing.strip() else ""
+    target.write_text(existing.rstrip() + prefix + block + "\n", encoding="utf-8")
+    return {"ok": True, "applied": True, "path": str(target)}
 
 
 @router.post("/wastes/scan")

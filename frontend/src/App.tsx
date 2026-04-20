@@ -5,6 +5,7 @@ import { AppShell } from "./components/AppShell";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar } from "./components/Sidebar";
 import { Topbar } from "./components/Topbar";
+import { TickerSSEBridge } from "./components/TickerSSEBridge";
 import { TweaksPanel } from "./components/TweaksPanel";
 import { useTweaks } from "./lib/tweaksStore";
 import { LiveMonitor } from "./views/LiveMonitor";
@@ -70,6 +71,7 @@ export default function App() {
         </ErrorBoundary>
       </AppShell>
       <TweaksPanel />
+      <TickerSSEBridge />
       {needsOnboarding && (
         <ErrorBoundary label="Onboarding">
           <Onboarding onClose={() => refetchOnboarding()} />

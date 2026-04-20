@@ -22,6 +22,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    deps: {
+      optimizer: {
+        web: { enabled: false },
+      },
+    },
     coverage: {
       reporter: ["text", "html"],
       include: ["src/**/*.{ts,tsx}"],

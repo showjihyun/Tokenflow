@@ -6,15 +6,17 @@ import { Card, CardBody, CardHeader } from "../../components/Card";
 import { HBar } from "../../components/charts/HBar";
 import { Sparkline } from "../../components/charts/Sparkline";
 import { fmt } from "../../lib/fmt";
+import { queryKeys } from "../../lib/queryKeys";
 
 const TREND_COLOR: Record<string, string> = {
   up: "var(--red)",
   down: "var(--green)",
   flat: "var(--blue)",
 };
+const EMPTY_TREND = [0, 0, 0, 0, 0, 0, 0];
 
 export function ProjectsTable() {
-  const { data } = useQuery({ queryKey: ["projects", "7d"], queryFn: () => api.projects("7d") });
+  const { data } = useQuery({ queryKey: queryKeys.projects("7d"), queryFn: () => api.projects("7d") });
 
   return (
     <Card>
@@ -80,8 +82,8 @@ export function ProjectsTable() {
                   </td>
                   <td>
                     <Sparkline
-                      data={[2, 3, 1, 4, 3, 5, 4].map((v) => v + (p.trend === "up" ? 1 : 0))}
-                      color={p.trend === "up" ? "var(--red)" : "var(--green)"}
+                      data={p.trendData ?? EMPTY_TREND}
+                      color={p.trend === "up" ? "var(--red)" : p.trend === "down" ? "var(--green)" : "var(--blue)"}
                       width={80}
                       height={24}
                     />

@@ -79,7 +79,27 @@
       "Bash(python -m json.tool)",
       "Bash(xargs wc *)",
       "Bash(.venv/Scripts/python.exe -m pytest tests/test_coach_error_paths.py -v)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(curl -s -o /dev/null -w \"root: HTTP %{http_code} size %{size_download}\\\\n\" http://127.0.0.1:8765/)",
+      "Bash(curl -s -o /dev/null -w \"live: HTTP %{http_code}\\\\n\" http://127.0.0.1:8765/live)",
+      "Bash(tasklist //FI \"PID eq 67908\")",
+      "Bash(taskkill //F //PID 67908)",
+      "Bash(echo \"started PID $!\")",
+      "Bash(curl -sf http://127.0.0.1:8765/api/system/health)",
+      "Bash(.venv/Scripts/python.exe -c \"from tokenflow.adapters.persistence import secret_store; import inspect; print\\(inspect.getsourcefile\\(secret_store\\)\\); print\\('---'\\); print\\(inspect.getsource\\(secret_store.status\\)\\)\")",
+      "Bash(awk '{print $NF}')",
+      "Bash(taskkill //F //PID 31092)",
+      "Bash(echo \"new PID $!\")",
+      "Bash(rm -rf /tmp/tf-demo)",
+      "Bash(mkdir -p /tmp/tf-demo)",
+      "Bash(TOKENFLOW_HOME=/tmp/tf-demo .venv/Scripts/tokenflow.exe serve --host 127.0.0.1 --port 8765)",
+      "Bash(echo \"PID $!\")"
     ]
   }
 }

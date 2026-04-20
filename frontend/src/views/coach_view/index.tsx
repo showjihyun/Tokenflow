@@ -11,6 +11,7 @@ export function AICoach() {
   const qc = useQueryClient();
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [qualityDraft, setQualityDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const keyStatus = useQuery({ queryKey: ["api-key-status"], queryFn: () => api.apiKeyStatus() });
@@ -31,6 +32,16 @@ export function AICoach() {
   const budget = useQuery({ queryKey: ["kpi-budget"], queryFn: () => api.kpiBudget() });
   const wastes = useQuery({ queryKey: ["wastes", "active"], queryFn: () => api.listWastes("active") });
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings() });
+  const quality = useQuery({
+    queryKey: ["coach-query-quality", qualityDraft, session.data?.project],
+    queryFn: () =>
+      api.queryQuality(qualityDraft, {
+        project: session.data?.project,
+        model: session.data?.model,
+      }),
+    enabled: qualityDraft.length >= 6,
+    staleTime: 5_000,
+  });
 
   useEffect(() => {
     if (!activeThread && threads.data && threads.data.length > 0) {
@@ -41,6 +52,14 @@ export function AICoach() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.data]);
+
+  useEffect(() => {
+    const trimmed = draft.trim();
+    const timer = window.setTimeout(() => {
+      setQualityDraft(trimmed);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [draft]);
 
   const createThread = useMutation({
     mutationFn: (title?: string) => api.createCoachThread(title),
@@ -209,11 +228,21 @@ export function AICoach() {
                 <span>
                   Enter 전송 · Shift+Enter 줄바꿈
                   {draft.trim() ? ` · Est. cost ${fmt.usd(estCost)}` : ""}
+                  {quality.data ? ` · Quality ${quality.data.grade} (${quality.data.score})` : ""}
                 </span>
                 <Button variant="primary" size="sm" onClick={onSend} disabled={!draft.trim() || sendMessage.isPending}>
                   <Send size={12} strokeWidth={1.8} /> Send
                 </Button>
               </div>
+              {quality.data && (
+                <div className="coach-quality">
+                  {Object.entries(quality.data.signals).map(([key, value]) => (
+                    <span key={key} data-low={value < 20}>
+                      {key.replace("_", " ")} {value}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

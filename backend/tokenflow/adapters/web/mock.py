@@ -34,8 +34,28 @@ def kpi_summary(window: str = "today") -> dict[str, Any]:
             "delta": -0.06,
             "series": [1.8, 2.1, 1.9, 2.4, 1.6, 1.3, 1.7],
         },
-        "efficiency": {"score": 72, "delta": 4, "series": [62, 64, 61, 65, 68, 70, 72]},
-        "waste": {"tokens": 184_000, "pct": 14.8, "delta": -0.03},
+        "efficiency": {
+            "score": 72,
+            "delta": 4,
+            "series": [62, 64, 61, 65, 68, 70, 72],
+            "attribution": {
+                "score": 72,
+                "totalTokens": 1_240_000,
+                "wastedTokens": 184_000,
+                "opusMisuseTokens": 82_000,
+                "contextBloatTokens": 66_000,
+                "wasteRatio": 0.148,
+                "opusMisuseRatio": 0.066,
+                "contextBloatRatio": 0.053,
+                "penalty": {"waste": 5.9, "opusMisuse": 2.0, "contextBloat": 1.6, "total": 9.5},
+            },
+        },
+        "waste": {
+            "tokens": 184_000,
+            "pct": 14.8,
+            "delta": -0.03,
+            "byKind": [{"kind": "context-bloat", "findings": 3, "tokens": 66_000, "usd": 0.82}],
+        },
         "window": window,
     }
 

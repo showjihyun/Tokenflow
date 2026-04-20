@@ -321,6 +321,7 @@ A ≥ 85, B ≥ 70, C ≥ 55, D < 55
 - V9: `tf_config.llm_model`
 - V10: `tf_messages.paused`, `daily_aggregate`
 - V11: `budget_threshold`, `api_error` notification preferences
+- V12: `tf_notifications` persisted in-app notification history
 
 마이그레이션은 현재 **forward-only** 로 적용된다. pending migration 적용 전 DB 파일 백업은 수행한다. 실패 로그/자동 복원은 추가 개선 항목이다.
 
@@ -521,14 +522,14 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | GET | `/sessions/{sid}/replay?include_paused=false` | Replay 이벤트. 기본 paused message 제외 |
 | GET | `/sessions/{sid}/export?include_paused=false` | `tokenflow.export.v1` JSON export. 기본 paused message 제외 |
 | GET | `/sessions?project=&has_waste=&q=&limit=` | 세션 검색·필터. totals/messages/cost/search 는 paused message 제외 |
-| GET | `/events/stream` | Activity ticker SSE (`Last-Event-ID` 지원) |
+| GET | `/events/stream?replay=true` | Activity ticker SSE (`Last-Event-ID` 지원). Frontend Topbar/ActivityTicker share one `TickerSSEBridge` connection with `replay=false`; `TokenFlowChart` keeps separate flow SSE. |
 | GET | `/sessions/current/flow?window=60m` | 60분 flow chart JSON snapshot |
 | GET | `/sessions/current/flow/stream?window=60m` | Flow chart SSE snapshot/invalidation (`event: flow`) |
 
 ### 8.2 KPI / 분석
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/kpi/summary?window=today\|7d\|30d` | |
+| GET | `/kpi/summary?window=today\|7d\|30d` | Efficiency attribution is computed with grouped waste rollups, including `byKind` breakdown. |
 | GET | `/kpi/models` | 모델별 오늘 token/cost/share |
 | GET | `/kpi/budget` | 월 예산, 사용액, forecast, Opus share |
 | GET | `/analytics/kpi?range=7d&project=` | 분석 KPI summary |
@@ -566,6 +567,12 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | PATCH/DELETE | `/settings/routing-rules/{id}` | |
 | GET | `/settings/notifications` | |
 | PATCH | `/settings/notifications/{pref_key}` | |
+| GET | `/notifications?limit=10` | persisted in-app Bell notification history |
+| GET | `/notifications/unread-count` | Bell badge total unread count. Do not infer badge from the limited recent-history response. |
+| POST | `/notifications` | in-app notification 저장. disabled/system pref 는 저장하지 않음 |
+| PATCH | `/notifications/{id}/read` | 개별 Bell notification read 처리 |
+| POST | `/notifications/read-all` | unread Bell notification 일괄 read 처리 |
+| DELETE | `/notifications` | Bell notification clear all |
 | POST | `/settings/api-key` | |
 | GET | `/settings/api-key/status` | `{configured, valid, backend}` |
 | DELETE | `/settings/api-key` | |
@@ -574,8 +581,8 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 ### 8.6 Projects
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/projects?range=7d` | |
-| GET | `/projects/{name}/trend?range=7d` | 현재는 7점 placeholder 스파크라인 |
+| GET | `/projects?range=7d` | includes `trendData` per project from one grouped project/day query to avoid row-level trend N+1 calls |
+| GET | `/projects/{name}/trend?range=7d` | project 일별 token sparkline. Single-project query path; must not call full `/projects` aggregation for existence checks. |
 
 ### 8.7 Better prompt
 | Method | Path | 설명 |
@@ -709,7 +716,7 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 11. Waste 탐지 → `/wastes/scan`, `/wastes/sweep` API 로 실행. SessionEnd 자동 평가는 추적 항목
 12. Better prompt LLM 템플릿 → §6.5 프롬프트 템플릿 고정
 13. Efficiency Score 포뮬러 → `tf_messages` + `tf_waste_patterns` 기반 실제 계산 구현
-14. Query Quality Score 포뮬러 → §5.3 정의
+14. Query Quality Score 포뮬러 → §5.3 정의, Coach composer 에 전송 전 grade/signal 표시
 15. Opus overuse 임계값 → 월 비용 점유율 15%(권장), 25%(알림 발생)
 16. DB retention → 180일 상세 보관 + `daily_aggregate` rollup 구현. 장기 analytics 에 rollup 을 병합하는 것은 추가 개선
 17. Pricing 업데이트 → 현재 seed table 기준. override 파일 지원은 추적 항목
@@ -732,13 +739,14 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | Import UX | CLI import + REST background job/status API, Settings Data 카드 job 상태 표시 구현 | 완료. 더 자세한 progress bar 는 추가 개선 |
 | 마이그레이션 안전성 | pending migration 적용 전 DB backup 생성 | 1차 완료. 실패 로그/자동 복원은 추가 개선 |
 | Retention/Vacuum | 앱 시작 및 `/system/vacuum` 에서 180일 retention + `daily_aggregate` rollup 수행, `/system/backups` 구현 | 완료. rollup 기반 장기 analytics 활용은 추가 개선 |
-| Live KPI efficiency/waste | `tf_messages` 총 토큰과 `tf_waste_patterns.save_tokens` 기반 Efficiency Score / Wasted Tokens 계산 | 완료. 더 정교한 waste attribution 은 추가 개선 |
-| Usage Analytics project filter | KPI/daily/heatmap/cost/top-wastes API와 UI project dropdown 연결 | 완료. 프로젝트별 trend 정밀화는 추가 개선 |
+| Live KPI efficiency/waste | `tf_messages` 총 토큰과 `tf_waste_patterns.save_tokens` 기반 Efficiency Score / Wasted Tokens 계산, penalty attribution 상세 패널 포함 | 완료. 더 정교한 waste attribution 은 추가 개선 |
+| Usage Analytics project filter | KPI/daily/heatmap/cost/top-wastes API와 UI project dropdown 연결 | 완료 |
+| Project trend sparkline | `/projects/{name}/trend` 가 project 일별 token series 반환, Projects table sparkline 연결 | 완료. 프로젝트 상세 drill-down 은 추가 개선 |
 | Top waste analytics | `/analytics/top-wastes` 가 `tf_waste_patterns` 실제 데이터에서 range/limit/project 기준 kind별 aggregate ranking 반환, Usage Analytics 카드 연결 | 완료. 세션 drill-down 은 추가 개선 |
-| Waste apply preview | `/wastes/{id}/apply` 가 outcome 과 CLAUDE.md/routing diff preview 를 반환하고 UI에 표시 | 완료. 실제 파일 패치 적용은 v1 범위 밖 |
+| Waste apply preview/apply | `/wastes/{id}/apply` 가 outcome 과 CLAUDE.md/routing diff preview 를 반환하고, 별도 confirm 으로 CLAUDE.md append | 완료. 더 정교한 conflict/diff UI 는 추가 개선 |
 | Pause tracking / Export session | pause flag API, paused hook marker, transcript message `paused` marker, 분석/list/replay/export 기본 제외, `include_paused=true` forensic 조회 지원 | 완료. pause 기간 UX 표시는 추가 개선 |
-| Query Quality Score API | `/coach/query-quality` 정적 scoring API 구현 | 완료. UI 노출은 추가 개선 |
-| Bell notification center | Topbar Bell 최근 10개 in-app 알림 + Clear all 구현 | 완료. persisted notification history 는 추가 개선 |
+| Query Quality Score | `/coach/query-quality` 정적 scoring API + Coach composer grade/signal UI 구현 | 완료. signal별 rewrite suggestion 은 추가 개선 |
+| Bell notification center | Topbar Bell 최근 10개 persisted in-app 알림, unread badge, dropdown open read-all, 개별 read, Clear all 구현 | 완료. persisted notification filter/search 는 추가 개선 |
 | System notifications | in-app/system preference, 브라우저 Notification 지원/권한 플로우, waste, SessionEnd, budget threshold, context saturation, Opus overuse, API error 이벤트 연결 | 완료. 더 세밀한 알림 빈도 제어는 추가 개선 |
 
 ---

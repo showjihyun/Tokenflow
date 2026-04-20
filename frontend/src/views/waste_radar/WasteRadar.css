@@ -136,3 +136,22 @@
   line-height: 1.5;
   white-space: pre-wrap;
 }
+
+.waste-preview-result,
+.waste-preview-error {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.waste-preview-result {
+  background: var(--green-w);
+  color: var(--green);
+}
+
+.waste-preview-error {
+  background: var(--red-w);
+  color: var(--red);
+}

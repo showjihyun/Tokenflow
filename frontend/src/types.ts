@@ -4,8 +4,33 @@ export interface KPISummary {
   currentSession: { tokens: number; delta: string };
   today: { tokens: number; cost: number; delta: number; series: number[] };
   week: { tokens: number; cost: number; delta: number; series: number[] };
-  efficiency: { score: number; delta: number; series: number[] };
-  waste: { tokens: number; pct: number; delta: number };
+  efficiency: {
+    score: number;
+    delta: number;
+    series: number[];
+    attribution?: {
+      totalTokens: number;
+      wastedTokens: number;
+      opusMisuseTokens: number;
+      contextBloatTokens: number;
+      wasteRatio: number;
+      opusMisuseRatio: number;
+      contextBloatRatio: number;
+      penalty: {
+        waste: number;
+        opusMisuse: number;
+        contextBloat: number;
+        total: number;
+      };
+      byKind?: { kind: string; findings: number; tokens: number; usd: number }[];
+    };
+  };
+  waste: {
+    tokens: number;
+    pct: number;
+    delta: number;
+    byKind?: { kind: string; findings: number; tokens: number; usd: number }[];
+  };
   window: string;
 }
 
@@ -64,6 +89,7 @@ export interface Project {
   sessions: number;
   waste: number;
   trend: "up" | "down" | "flat";
+  trendData?: number[];
   range: string;
 }
 

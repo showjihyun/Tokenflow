@@ -120,12 +120,24 @@
 }
 
 .bell-item {
+  display: block;
+  width: 100%;
+  text-align: left;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border-subtle);
+  color: inherit;
 }
 
 .bell-item:last-child {
   border-bottom: 0;
+}
+
+.bell-item:hover {
+  background: var(--bg-hover);
+}
+
+.bell-item[data-unread="true"] {
+  background: color-mix(in oklch, var(--amber-w) 72%, transparent);
 }
 
 .bell-item-top {

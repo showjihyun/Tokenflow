@@ -24,8 +24,6 @@ async def project_trend(
     range: str = "7d",
     repo: Repository = Depends(get_repo),
 ) -> dict[str, Any]:
-    projects = repo.projects(range)
-    if not any(p["name"] == name for p in projects):
+    if not repo.project_exists(name):
         raise HTTPException(status_code=404, detail=f"unknown project: {name}")
-    # v1.0 approximation: reuse 7-point flat series; precise per-project daily sums = Phase D
-    return {"name": name, "range": range, "data": [0, 0, 0, 0, 0, 0, 0]}
+    return repo.project_trend(name, range)

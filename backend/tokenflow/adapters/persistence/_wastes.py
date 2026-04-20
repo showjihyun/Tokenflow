@@ -225,3 +225,96 @@ class _WasteMixin(_BaseRepo):
                 "WHERE pref_key = ?",
                 (channel, pref_key),
             )
+
+    # ---------- Notification events ----------
+    def list_notifications(self, *, limit: int = 10) -> list[dict[str, Any]]:
+        safe_limit = max(1, min(int(limit), 50))
+        rows = self._q(
+            """
+            SELECT id, pref_key, title, body, created_at, read_at
+            FROM tf_notifications
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        )
+        return [
+            {
+                "id": r[0],
+                "prefKey": r[1],
+                "title": r[2],
+                "body": r[3],
+                "createdAt": r[4].isoformat() if r[4] else None,
+                "readAt": r[5].isoformat() if r[5] else None,
+            }
+            for r in rows
+        ]
+
+    def unread_notification_count(self) -> int:
+        rows = self._q("SELECT COUNT(*) FROM tf_notifications WHERE read_at IS NULL")
+        return int(rows[0][0]) if rows else 0
+
+    def insert_notification(
+        self,
+        *,
+        id: str,
+        pref_key: str,
+        title: str,
+        body: str,
+        created_at: datetime,
+    ) -> bool:
+        try:
+            self._exec(
+                """
+                INSERT INTO tf_notifications (id, pref_key, title, body, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (id, pref_key, title, body, created_at),
+            )
+            return True
+        except duckdb.ConstraintException:
+            return False
+
+    def clear_notifications(self) -> int:
+        rows = self._q("SELECT COUNT(*) FROM tf_notifications")
+        count = int(rows[0][0]) if rows else 0
+        self._exec("DELETE FROM tf_notifications")
+        return count
+
+    def mark_notification_read(self, notification_id: str, *, read_at: datetime) -> dict[str, Any] | None:
+        self._exec(
+            """
+            UPDATE tf_notifications
+            SET read_at = COALESCE(read_at, ?)
+            WHERE id = ?
+            """,
+            (read_at, notification_id),
+        )
+        rows = self._q(
+            """
+            SELECT id, pref_key, title, body, created_at, read_at
+            FROM tf_notifications
+            WHERE id = ?
+            """,
+            (notification_id,),
+        )
+        if not rows:
+            return None
+        r = rows[0]
+        return {
+            "id": r[0],
+            "prefKey": r[1],
+            "title": r[2],
+            "body": r[3],
+            "createdAt": r[4].isoformat() if r[4] else None,
+            "readAt": r[5].isoformat() if r[5] else None,
+        }
+
+    def mark_all_notifications_read(self, *, read_at: datetime) -> int:
+        rows = self._q("SELECT COUNT(*) FROM tf_notifications WHERE read_at IS NULL")
+        count = int(rows[0][0]) if rows else 0
+        self._exec(
+            "UPDATE tf_notifications SET read_at = COALESCE(read_at, ?) WHERE read_at IS NULL",
+            (read_at,),
+        )
+        return count

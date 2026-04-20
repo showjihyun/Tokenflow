@@ -6,6 +6,7 @@ import threading
 import pytest
 
 from tokenflow.adapters.web.pubsub import EventBus
+from tokenflow.adapters.web.routes.events import _as_ticker
 
 
 @pytest.mark.asyncio
@@ -85,3 +86,9 @@ async def test_buffer_ringbuffer_semantics() -> None:
     assert q.get_nowait() == (4, {"n": 3})
     assert q.get_nowait() == (5, {"n": 4})
     assert q.empty()
+
+
+def test_ticker_uses_stable_event_id() -> None:
+    ticker = _as_ticker({"kind": "waste-detected", "severity": "high", "waste_kind": "tool-loop"}, event_id=42)
+    assert ticker is not None
+    assert ticker["id"] == 42

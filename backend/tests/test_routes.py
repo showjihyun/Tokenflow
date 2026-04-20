@@ -103,3 +103,26 @@ def test_migrations_idempotent() -> None:
     with TestClient(create_app()) as c:
         r = c.get("/api/system/health")
         assert r.status_code == 200
+
+
+def test_analytics_range_rejects_invalid_value() -> None:
+    """Pydantic Literal validation: unsupported range strings should 422, not silently default."""
+    with TestClient(create_app()) as c:
+        for path in (
+            "/api/analytics/kpi",
+            "/api/analytics/daily",
+            "/api/analytics/heatmap",
+            "/api/analytics/cost-breakdown",
+            "/api/analytics/top-wastes",
+        ):
+            r = c.get(f"{path}?range=banana")
+            assert r.status_code == 422, f"{path} accepted invalid range"
+
+
+def test_analytics_top_wastes_rejects_out_of_range_limit() -> None:
+    with TestClient(create_app()) as c:
+        assert c.get("/api/analytics/top-wastes?limit=0").status_code == 422
+        assert c.get("/api/analytics/top-wastes?limit=51").status_code == 422
+        assert c.get("/api/analytics/top-wastes?limit=50").status_code == 200
+
+

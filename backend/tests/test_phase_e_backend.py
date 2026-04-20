@@ -289,3 +289,64 @@ def test_notifications_default_and_patch() -> None:
         r = c.patch("/api/settings/notifications/waste_high", json={"enabled": False})
         assert r.status_code == 200
         assert r.json()["enabled"] is False
+
+
+def test_notification_events_persist_and_clear() -> None:
+    with TestClient(create_app()) as c:
+        c.patch("/api/settings/notifications/waste_high", json={"enabled": True, "channel": "in_app"})
+        r = c.post(
+            "/api/notifications",
+            json={
+                "id": "waste_high:evt-1",
+                "prefKey": "waste_high",
+                "title": "Waste detected",
+                "body": "high context-bloat",
+            },
+        )
+        assert r.status_code == 200
+        assert r.json()["stored"] is True
+
+        duplicate = c.post(
+            "/api/notifications",
+            json={
+                "id": "waste_high:evt-1",
+                "prefKey": "waste_high",
+                "title": "Waste detected",
+                "body": "high context-bloat",
+            },
+        )
+        assert duplicate.status_code == 200
+        assert duplicate.json()["stored"] is False
+
+        events = c.get("/api/notifications").json()
+        assert len(events) == 1
+        assert events[0]["prefKey"] == "waste_high"
+        assert events[0]["title"] == "Waste detected"
+        assert events[0]["readAt"] is None
+        assert c.get("/api/notifications/unread-count").json()["count"] == 1
+
+        read = c.patch("/api/notifications/waste_high%3Aevt-1/read")
+        assert read.status_code == 200
+        assert read.json()["readAt"] is not None
+        assert c.get("/api/notifications").json()[0]["readAt"] is not None
+        assert c.get("/api/notifications/unread-count").json()["count"] == 0
+
+        c.post(
+            "/api/notifications",
+            json={
+                "id": "waste_high:evt-2",
+                "prefKey": "waste_high",
+                "title": "Waste detected",
+                "body": "repeat-question",
+            },
+        )
+        read_all = c.post("/api/notifications/read-all")
+        assert read_all.status_code == 200
+        assert read_all.json()["updated"] == 1
+        assert all(e["readAt"] is not None for e in c.get("/api/notifications").json())
+        assert c.get("/api/notifications/unread-count").json()["count"] == 0
+
+        cleared = c.delete("/api/notifications")
+        assert cleared.status_code == 200
+        assert cleared.json()["deleted"] == 2
+        assert c.get("/api/notifications").json() == []

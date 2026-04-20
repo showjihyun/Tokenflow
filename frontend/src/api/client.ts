@@ -22,7 +22,6 @@ export interface HealthResponse {
   api_key_detail?: {
     configured: boolean;
     valid: boolean;
-    backend: "keyring" | "file";
     error?: string;
   };
   ingestion_paused?: boolean;
@@ -96,7 +95,7 @@ export interface OnboardingStatus {
     settings_exists: boolean;
   };
   api_key_configured: boolean;
-  api_key?: { configured: boolean; valid: boolean; backend: "keyring" | "file"; error?: string };
+  api_key?: { configured: boolean; valid: boolean; error?: string };
   ccprophet: { candidate_path: string; exists: boolean };
 }
 
@@ -194,7 +193,30 @@ export interface NotificationPref {
   channel: "in_app" | "system";
 }
 
+export interface NotificationEvent {
+  id: string;
+  prefKey: string;
+  title: string;
+  body: string;
+  createdAt: string | null;
+  readAt: string | null;
+}
+
 const BASE = "/api";
+
+export class ApiError extends Error {
+  status: number;
+  statusText: string;
+  detail: unknown;
+
+  constructor(status: number, statusText: string, detail: unknown) {
+    super(formatApiError(status, statusText, detail));
+    this.name = "ApiError";
+    this.status = status;
+    this.statusText = statusText;
+    this.detail = detail;
+  }
+}
 
 function analyticsParams(range: Range, project?: string) {
   const params = new URLSearchParams({ range });
@@ -208,9 +230,93 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     ...init,
   });
   if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText}`);
+    throw new ApiError(res.status, res.statusText, await parseErrorBody(res));
   }
   return (await res.json()) as T;
+}
+
+async function guardedFetch<T>(path: string, guard: (value: unknown) => value is T): Promise<T> {
+  const value = await apiFetch<unknown>(path);
+  if (!guard(value)) {
+    throw new Error(`Invalid API response for ${path}`);
+  }
+  return value;
+}
+
+async function parseErrorBody(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+function formatApiError(status: number, statusText: string, detail: unknown) {
+  if (typeof detail === "string") return `${status} ${statusText}: ${detail}`;
+  if (detail && typeof detail === "object") {
+    const record = detail as Record<string, unknown>;
+    const message = record.detail ?? record.error ?? record.message;
+    if (typeof message === "string") return `${status} ${statusText}: ${message}`;
+  }
+  return `${status} ${statusText}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object";
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isNumberArray(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every(isNumber);
+}
+
+function isKpiSummary(value: unknown): value is KPISummary {
+  if (!isRecord(value)) return false;
+  const currentSession = value.currentSession;
+  const today = value.today;
+  const efficiency = value.efficiency;
+  const waste = value.waste;
+  return (
+    isRecord(currentSession) &&
+    isNumber(currentSession.tokens) &&
+    isRecord(today) &&
+    isNumber(today.tokens) &&
+    isNumber(today.cost) &&
+    isNumber(today.delta) &&
+    isNumberArray(today.series) &&
+    isRecord(efficiency) &&
+    isNumber(efficiency.score) &&
+    isNumber(efficiency.delta) &&
+    isNumberArray(efficiency.series) &&
+    isRecord(waste) &&
+    isNumber(waste.tokens) &&
+    isNumber(waste.pct) &&
+    isNumber(waste.delta) &&
+    typeof value.window === "string"
+  );
+}
+
+function isCurrentSession(value: unknown): value is CurrentSession & { active: boolean } {
+  if (!isRecord(value)) return false;
+  const tokens = value.tokens;
+  return (
+    typeof value.active === "boolean" &&
+    (typeof value.id === "string" || value.id === null) &&
+    isRecord(tokens) &&
+    isNumber(tokens.input) &&
+    isNumber(tokens.output) &&
+    isNumber(tokens.cacheRead) &&
+    isNumber(tokens.cacheWrite) &&
+    isNumber(value.contextWindow) &&
+    isNumber(value.contextUsed) &&
+    isNumber(value.costUSD) &&
+    isNumber(value.messages)
+  );
 }
 
 export const api = {
@@ -218,12 +324,12 @@ export const api = {
 
   // KPI (Live Monitor)
   kpiSummary: (window: "today" | "7d" | "30d" = "today") =>
-    apiFetch<KPISummary>(`/kpi/summary?window=${window}`),
+    guardedFetch<KPISummary>(`/kpi/summary?window=${window}`, isKpiSummary),
   kpiModels: () => apiFetch<ModelShare[]>("/kpi/models"),
   kpiBudget: () => apiFetch<Budget>("/kpi/budget"),
 
   // Sessions
-  currentSession: () => apiFetch<CurrentSession & { active: boolean }>("/sessions/current"),
+  currentSession: () => guardedFetch<CurrentSession & { active: boolean }>("/sessions/current", isCurrentSession),
   currentSessionFlow: (window = "60m") =>
     apiFetch<FlowResponse>(`/sessions/current/flow?window=${window}`),
 
@@ -254,11 +360,11 @@ export const api = {
   patchTweaks: (body: Partial<SettingsResponse["tweaks"]>) =>
     apiFetch<SettingsResponse>("/settings/tweaks", { method: "PATCH", body: JSON.stringify(body) }),
   apiKeyStatus: () =>
-    apiFetch<{ configured: boolean; valid: boolean; backend: "keyring" | "file"; error?: string }>(
+    apiFetch<{ configured: boolean; valid: boolean; error?: string }>(
       "/settings/api-key/status",
     ),
   setApiKey: (key: string) =>
-    apiFetch<{ configured: boolean; backend: "keyring" | "file" }>("/settings/api-key", {
+    apiFetch<{ configured: boolean }>("/settings/api-key", {
       method: "POST",
       body: JSON.stringify({ key }),
     }),
@@ -319,6 +425,11 @@ export const api = {
       outcome: string;
       preview: { path: string; title: string; diff: string } | null;
     }>(`/wastes/${encodeURIComponent(id)}/apply`, { method: "POST" }),
+  confirmWasteFix: (id: string) =>
+    apiFetch<{ ok: boolean; applied: boolean; path?: string; reason?: string }>(
+      `/wastes/${encodeURIComponent(id)}/apply-confirm`,
+      { method: "POST" },
+    ),
   scanWastes: (sessionId?: string) =>
     apiFetch<{ new: string[] }>(`/wastes/scan${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`, {
       method: "POST",
@@ -387,4 +498,23 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+  listNotificationEvents: (limit = 10) => apiFetch<NotificationEvent[]>(`/notifications?limit=${limit}`),
+  unreadNotificationCount: () => apiFetch<{ count: number }>("/notifications/unread-count"),
+  createNotificationEvent: (body: {
+    id: string;
+    prefKey: string;
+    title: string;
+    body: string;
+    createdAt?: string;
+  }) =>
+    apiFetch<{ ok: boolean; stored: boolean }>("/notifications", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  clearNotificationEvents: () =>
+    apiFetch<{ ok: boolean; deleted: number }>("/notifications", { method: "DELETE" }),
+  markNotificationRead: (id: string) =>
+    apiFetch<NotificationEvent>(`/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" }),
+  markAllNotificationsRead: () =>
+    apiFetch<{ ok: boolean; updated: number }>("/notifications/read-all", { method: "POST" }),
 };

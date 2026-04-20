@@ -10,8 +10,10 @@ interface UseSSEOptions<T> {
 
 interface SSEState<T> {
   events: T[];
+  latestEvent: T | null;
   status: "idle" | "connecting" | "open" | "closed";
   lastEventId: number;
+  error: string | null;
 }
 
 export function useSSE<T = unknown>({
@@ -22,8 +24,10 @@ export function useSSE<T = unknown>({
   enabled = true,
 }: UseSSEOptions<T>): SSEState<T> {
   const [events, setEvents] = useState<T[]>([]);
+  const [latestEvent, setLatestEvent] = useState<T | null>(null);
   const [status, setStatus] = useState<SSEState<T>["status"]>("idle");
   const [lastEventId, setLastEventId] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const sourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -32,6 +36,7 @@ export function useSSE<T = unknown>({
       return;
     }
     setStatus("connecting");
+    setError(null);
     const source = new EventSource(url);
     sourceRef.current = source;
 
@@ -40,8 +45,15 @@ export function useSSE<T = unknown>({
 
     const handler = (e: MessageEvent<string>) => {
       const id = Number(e.lastEventId) || 0;
-      const parsed = parse ? parse(e.data) : (JSON.parse(e.data) as T);
+      let parsed: T;
+      try {
+        parsed = parse ? parse(e.data) : (JSON.parse(e.data) as T);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to parse SSE event");
+        return;
+      }
       setLastEventId((prev) => Math.max(prev, id));
+      setLatestEvent(parsed);
       setEvents((prev) => {
         const next = [parsed, ...prev];
         return next.slice(0, bufferSize);
@@ -57,5 +69,5 @@ export function useSSE<T = unknown>({
     };
   }, [url, event, bufferSize, parse, enabled]);
 
-  return { events, status, lastEventId };
+  return { events, latestEvent, status, lastEventId, error };
 }

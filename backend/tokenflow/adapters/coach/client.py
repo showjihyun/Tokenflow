@@ -1,4 +1,4 @@
-"""Thin Anthropic SDK wrapper. Loads the API key via secret_store (OS keyring first)."""
+"""Thin Anthropic SDK wrapper. Loads the API key via secret_store."""
 from __future__ import annotations
 
 import logging

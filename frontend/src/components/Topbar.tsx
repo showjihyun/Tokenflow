@@ -1,11 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import { useSSE } from "../hooks/useSSE";
-import { useNotificationStore } from "../lib/notificationStore";
+import { queryKeys } from "../lib/queryKeys";
 import { useTweaks } from "../lib/tweaksStore";
-import type { TickerEvent } from "../types";
 import "./Topbar.css";
 
 interface TopbarProps {
@@ -14,38 +12,97 @@ interface TopbarProps {
 }
 
 export function Topbar({ currentLabel, showRangePicker = false }: TopbarProps) {
+  const qc = useQueryClient();
   const [bellOpen, setBellOpen] = useState(false);
-  const lastInApp = useRef<string | null>(null);
+  const bellWrapRef = useRef<HTMLDivElement | null>(null);
+  const bellButtonRef = useRef<HTMLButtonElement | null>(null);
+  const bellMenuRef = useRef<HTMLDivElement | null>(null);
   const togglePanel = useTweaks((s) => s.togglePanel);
-  const notices = useNotificationStore((s) => s.notices);
-  const addNotice = useNotificationStore((s) => s.addNotice);
-  const clearAll = useNotificationStore((s) => s.clearAll);
   const { data: health } = useQuery({
     queryKey: ["system-health"],
     queryFn: () => api.health(),
     refetchInterval: 10_000,
   });
-  const { data: notifications } = useQuery({
-    queryKey: ["notifications"],
-    queryFn: () => api.listNotifications(),
+  const { data: notices = [] } = useQuery({
+    queryKey: queryKeys.notificationEvents,
+    queryFn: () => api.listNotificationEvents(10),
   });
-  const { events } = useSSE<TickerEvent>({
-    url: "/api/events/stream",
-    event: "ticker",
-    bufferSize: 1,
+  const { data: unread } = useQuery({
+    queryKey: queryKeys.notificationUnreadCount,
+    queryFn: () => api.unreadNotificationCount(),
+  });
+  const clearAll = useMutation({
+    mutationFn: api.clearNotificationEvents,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.notificationEvents });
+      qc.invalidateQueries({ queryKey: queryKeys.notificationUnreadCount });
+    },
+  });
+  const markRead = useMutation({
+    mutationFn: api.markNotificationRead,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.notificationEvents });
+      qc.invalidateQueries({ queryKey: queryKeys.notificationUnreadCount });
+    },
+  });
+  const markAllRead = useMutation({
+    mutationFn: api.markAllNotificationsRead,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.notificationEvents });
+      qc.invalidateQueries({ queryKey: queryKeys.notificationUnreadCount });
+    },
   });
 
-  const latest = events[0];
+  const unreadCount = unread?.count ?? notices.filter((n) => !n.readAt).length;
+  const toggleBell = () => {
+    const next = !bellOpen;
+    setBellOpen(next);
+    if (next && unreadCount > 0 && !markAllRead.isPending) {
+      markAllRead.mutate();
+    }
+  };
+
   useEffect(() => {
-    const notice = inAppNoticeFor(latest);
-    if (!latest || !notice) return;
-    const id = `${notice.prefKey}:${latest.id}`;
-    if (id === lastInApp.current) return;
-    const pref = notifications?.find((p) => p.key === notice.prefKey);
-    if (!pref?.enabled || pref.channel !== "in_app") return;
-    lastInApp.current = id;
-    addNotice({ id, ...notice, time: latest.time });
-  }, [latest, notifications, addNotice]);
+    if (!bellOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && !bellWrapRef.current?.contains(target)) {
+        setBellOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setBellOpen(false);
+        bellButtonRef.current?.focus();
+      }
+      if (event.key === "Tab") {
+        const focusable = bellMenuRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+        if (!focusable || focusable.length === 0) return;
+        const first = focusable[0]!;
+        const last = focusable[focusable.length - 1]!;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [bellOpen]);
+
+  useEffect(() => {
+    if (!bellOpen) return;
+    window.setTimeout(() => {
+      bellMenuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    }, 0);
+  }, [bellOpen]);
 
   const status =
     health?.hook === "active" || health?.hook === "ok"
@@ -79,20 +136,23 @@ export function Topbar({ currentLabel, showRangePicker = false }: TopbarProps) {
       <button className="icon-btn" aria-label="Search">
         <Search size={15} strokeWidth={1.6} />
       </button>
-      <div className="bell-wrap">
+      <div className="bell-wrap" ref={bellWrapRef}>
         <button
+          ref={bellButtonRef}
           className="icon-btn"
           aria-label="Notifications"
-          onClick={() => setBellOpen((open) => !open)}
+          aria-haspopup="menu"
+          aria-expanded={bellOpen}
+          onClick={toggleBell}
         >
           <Bell size={15} strokeWidth={1.6} />
-          {notices.length > 0 && <span className="bell-dot">{notices.length}</span>}
+          {unreadCount > 0 && <span className="bell-dot">{unreadCount}</span>}
         </button>
         {bellOpen && (
-          <div className="bell-menu">
+          <div className="bell-menu" ref={bellMenuRef} role="menu" aria-label="Notifications">
             <div className="bell-menu-head">
               <span>Notifications</span>
-              <button onClick={clearAll} disabled={notices.length === 0}>
+              <button onClick={() => clearAll.mutate()} disabled={notices.length === 0 || clearAll.isPending}>
                 Clear all
               </button>
             </div>
@@ -101,13 +161,21 @@ export function Topbar({ currentLabel, showRangePicker = false }: TopbarProps) {
                 <div className="bell-empty">No recent notifications.</div>
               ) : (
                 notices.map((notice) => (
-                  <div key={notice.id} className="bell-item">
+                  <button
+                    key={notice.id}
+                    className="bell-item"
+                    role="menuitem"
+                    data-unread={!notice.readAt}
+                    onClick={() => {
+                      if (!notice.readAt) markRead.mutate(notice.id);
+                    }}
+                  >
                     <div className="bell-item-top">
                       <span>{notice.title}</span>
-                      <time>{notice.time}</time>
+                      <time>{formatNoticeTime(notice.createdAt)}</time>
                     </div>
                     <div className="bell-item-body">{notice.body}</div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>
@@ -121,15 +189,7 @@ export function Topbar({ currentLabel, showRangePicker = false }: TopbarProps) {
   );
 }
 
-function inAppNoticeFor(event: TickerEvent | undefined) {
-  if (!event) return null;
-  if (event.t === "waste") return { prefKey: "waste_high", title: "Waste detected", body: event.label };
-  if (event.t === "budget") return { prefKey: "budget_threshold", title: "Budget alert", body: event.label };
-  if (event.t === "context") return { prefKey: "context_saturation", title: "Context alert", body: event.label };
-  if (event.t === "opus") return { prefKey: "opus_overuse", title: "Opus alert", body: event.label };
-  if (event.t === "api_error") return { prefKey: "api_error", title: "API error", body: event.label };
-  if (event.t === "tool" && event.label === "SessionEnd") {
-    return { prefKey: "session_summary", title: "Session ended", body: "Session summary is ready." };
-  }
-  return null;
+function formatNoticeTime(value: string | null) {
+  if (!value) return "";
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }

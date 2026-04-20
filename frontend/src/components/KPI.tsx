@@ -13,6 +13,7 @@ interface KPIProps {
   accent: string;
   spark?: number[];
   sparkColor?: string;
+  detail?: ReactNode;
 }
 
 export function KPI({
@@ -25,9 +26,10 @@ export function KPI({
   accent,
   spark,
   sparkColor,
+  detail,
 }: KPIProps) {
   return (
-    <div className="kpi" style={{ "--kpi-accent": accent } as React.CSSProperties}>
+    <div className="kpi" style={{ "--kpi-accent": accent } as React.CSSProperties} tabIndex={detail ? 0 : undefined}>
       <div className="kpi-accent-bar" />
       <div className="kpi-label">{label}</div>
       <div className="kpi-value tnum mono">
@@ -47,6 +49,7 @@ export function KPI({
           <Sparkline data={spark} color={sparkColor ?? accent} width={80} height={28} />
         </div>
       )}
+      {detail && <div className="kpi-detail">{detail}</div>}
     </div>
   );
 }

@@ -25,41 +25,42 @@ def _as_int(value: object) -> int:
     return 0
 
 
-def _as_ticker(payload: dict[str, object]) -> dict[str, object] | None:
+def _as_ticker(payload: dict[str, object], *, event_id: int) -> dict[str, object] | None:
     """Shape a bus event into the ticker-event contract the frontend expects."""
     now_hhmmss = datetime.now(tz=UTC).astimezone().strftime("%H:%M:%S")
-    now_id = int(datetime.now(tz=UTC).timestamp() * 1000)
 
     if payload.get("kind") == "message":
         tokens = _as_int(payload.get("tokens_in")) + _as_int(payload.get("tokens_out"))
         role = str(payload.get("role") or "assistant")
         model = str(payload.get("model") or "")
         label = f"{role} · {model}".strip(" ·")
-        return {"id": now_id, "t": "reply", "label": label or role, "tk": tokens, "time": now_hhmmss}
+        return {"id": event_id, "t": "reply", "label": label or role, "tk": tokens, "time": now_hhmmss}
 
     if payload.get("kind") == "waste-detected":
         severity = str(payload.get("severity") or "waste")
         waste_kind = str(payload.get("waste_kind") or "waste")
-        return {"id": now_id, "t": "waste", "label": f"{severity} {waste_kind}", "tk": 0, "time": now_hhmmss}
+        return {"id": event_id, "t": "waste", "label": f"{severity} {waste_kind}", "tk": 0, "time": now_hhmmss}
 
     if payload.get("kind") == "budget-threshold":
         threshold = payload.get("threshold_pct") or "budget"
         spent = payload.get("spent")
         budget = payload.get("budget")
-        return {"id": now_id, "t": "budget", "label": f"Budget {threshold}% reached · ${spent} / ${budget}", "tk": 0, "time": now_hhmmss}
+        return {"id": event_id, "t": "budget", "label": f"Budget {threshold}% reached · ${spent} / ${budget}", "tk": 0, "time": now_hhmmss}
 
     if payload.get("kind") == "context-saturation":
-        pct = int(float(payload.get("pct") or 0) * 100)
-        return {"id": now_id, "t": "context", "label": f"Context saturation {pct}%", "tk": 0, "time": now_hhmmss}
+        pct_raw = payload.get("pct")
+        pct = int(float(pct_raw) * 100) if isinstance(pct_raw, int | float) else 0
+        return {"id": event_id, "t": "context", "label": f"Context saturation {pct}%", "tk": 0, "time": now_hhmmss}
 
     if payload.get("kind") == "opus-overuse":
-        pct = int(float(payload.get("share") or 0) * 100)
-        return {"id": now_id, "t": "opus", "label": f"Opus usage {pct}% of spend", "tk": 0, "time": now_hhmmss}
+        share_raw = payload.get("share")
+        pct = int(float(share_raw) * 100) if isinstance(share_raw, int | float) else 0
+        return {"id": event_id, "t": "opus", "label": f"Opus usage {pct}% of spend", "tk": 0, "time": now_hhmmss}
 
     if payload.get("kind") == "api-error":
         source = str(payload.get("source") or "API")
         status = str(payload.get("status") or "error")
-        return {"id": now_id, "t": "api_error", "label": f"{source} {status}", "tk": 0, "time": now_hhmmss}
+        return {"id": event_id, "t": "api_error", "label": f"{source} {status}", "tk": 0, "time": now_hhmmss}
 
     hook_event = payload.get("hook_event_name")
     if not isinstance(hook_event, str):
@@ -78,7 +79,7 @@ def _as_ticker(payload: dict[str, object]) -> dict[str, object] | None:
     else:
         kind = "tool"
         label = hook_event
-    return {"id": now_id, "t": kind, "label": label, "tk": 0, "time": now_hhmmss}
+    return {"id": event_id, "t": kind, "label": label, "tk": 0, "time": now_hhmmss}
 
 
 async def _generator(
@@ -95,7 +96,7 @@ async def _generator(
             except TimeoutError:
                 yield ": keepalive\n\n"
                 continue
-            ticker = _as_ticker(payload)
+            ticker = _as_ticker(payload, event_id=eid)
             if ticker is None:
                 continue
             yield f"id: {eid}\nevent: ticker\ndata: {json.dumps(ticker)}\n\n"
@@ -106,6 +107,7 @@ async def _generator(
 @router.get("/events/stream")
 async def events_stream(
     request: Request,
+    replay: bool = True,
     bus: EventBus = Depends(get_bus),
 ) -> StreamingResponse:
     last_id_header = request.headers.get("last-event-id") or "0"
@@ -113,6 +115,8 @@ async def events_stream(
         last_id = int(last_id_header)
     except ValueError:
         last_id = 0
+    if not replay and last_id == 0:
+        last_id = bus.last_seq()
     return StreamingResponse(
         _generator(request, bus, last_id),
         media_type="text/event-stream",

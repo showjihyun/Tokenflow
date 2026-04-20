@@ -28,7 +28,6 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ error, errorInfo });
     // Surface to the console so devs catch it in dev; in prod the fallback UI
     // still protects the rest of the app.
-    // eslint-disable-next-line no-console
     console.error("[ErrorBoundary]", this.props.label ?? "", error, errorInfo);
   }
 

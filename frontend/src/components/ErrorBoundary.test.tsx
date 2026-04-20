@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ErrorBoundary } from "./ErrorBoundary";
 
 // Render-time throw so componentDidCatch fires.
@@ -13,14 +13,6 @@ function Ok() {
 }
 
 describe("<ErrorBoundary>", () => {
-  // React logs uncaught render errors to console.error — silence them so the
-  // test output stays readable.
-  let spy: ReturnType<typeof vi.spyOn>;
-  beforeAll(() => {
-    spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-  });
-  afterAll(() => spy.mockRestore());
-
   it("renders children when they don't throw", () => {
     render(
       <ErrorBoundary>

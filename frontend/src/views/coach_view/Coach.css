@@ -241,6 +241,33 @@
   align-items: center;
   font-size: 11px;
   color: var(--fg-3);
+  gap: 10px;
+}
+
+.coach-input-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.coach-quality {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.coach-quality span {
+  padding: 3px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.coach-quality span[data-low="true"] {
+  border-color: color-mix(in oklch, var(--amber) 35%, transparent);
+  background: var(--amber-w);
+  color: var(--amber);
 }
 
 .coach-context {

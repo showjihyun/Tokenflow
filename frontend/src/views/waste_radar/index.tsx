@@ -43,6 +43,7 @@ function iconFor(kind: WasteKind) {
 export function WasteRadar() {
   const qc = useQueryClient();
   const [appliedPreview, setAppliedPreview] = useState<{
+    wasteId: string;
     outcome: string;
     preview: { path: string; title: string; diff: string } | null;
   } | null>(null);
@@ -70,11 +71,14 @@ export function WasteRadar() {
   });
   const apply = useMutation({
     mutationFn: (id: string) => api.applyWaste(id),
-    onSuccess: (result) => {
-      setAppliedPreview({ outcome: result.outcome, preview: result.preview });
+    onSuccess: (result, wasteId) => {
+      setAppliedPreview({ wasteId, outcome: result.outcome, preview: result.preview });
       qc.invalidateQueries({ queryKey: ["wastes"] });
       qc.invalidateQueries({ queryKey: ["routing-rules"] });
     },
+  });
+  const confirmApply = useMutation({
+    mutationFn: (id: string) => api.confirmWasteFix(id),
   });
 
   const active = wastes ?? [];
@@ -122,12 +126,35 @@ export function WasteRadar() {
             icon={<Check size={13} strokeWidth={1.6} />}
             sub={appliedPreview.outcome}
             action={
-              <Button variant="ghost" size="sm" onClick={() => setAppliedPreview(null)}>
-                <X size={12} strokeWidth={1.8} /> Close
-              </Button>
+              <div className="hstack">
+                {appliedPreview.preview?.path === "CLAUDE.md" && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => confirmApply.mutate(appliedPreview.wasteId)}
+                    disabled={confirmApply.isPending}
+                  >
+                    <Check size={12} strokeWidth={1.8} />{" "}
+                    {confirmApply.isPending ? "Applying" : "Apply to CLAUDE.md"}
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setAppliedPreview(null)}>
+                  <X size={12} strokeWidth={1.8} /> Close
+                </Button>
+              </div>
             }
           />
           <CardBody>
+            {confirmApply.data && (
+              <div className="waste-preview-result">
+                {confirmApply.data.applied
+                  ? `Applied to ${confirmApply.data.path}`
+                  : `No file change: ${confirmApply.data.reason ?? "not applicable"}`}
+              </div>
+            )}
+            {confirmApply.isError && (
+              <div className="waste-preview-error">{(confirmApply.error as Error).message}</div>
+            )}
             {appliedPreview.preview ? (
               <>
                 <div className="waste-preview-path">{appliedPreview.preview.path}</div>

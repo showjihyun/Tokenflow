@@ -101,7 +101,105 @@ def test_analytics_project_filter_and_efficiency_score() -> None:
 
         live = c.get("/api/kpi/summary?window=7d").json()
         assert live["efficiency"]["score"] < 100
+        assert live["efficiency"]["attribution"]["wastedTokens"] == 1000
+        assert live["efficiency"]["attribution"]["contextBloatTokens"] == 1000
         assert live["waste"]["tokens"] == 1000
+        assert live["waste"]["byKind"][0]["kind"] == "context-bloat"
+
+
+def test_project_trend_returns_daily_tokens() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from tokenflow.adapters.persistence.repository import Repository
+
+    with TestClient(create_app()) as c:
+        repo: Repository = c.app.state.repo  # type: ignore[attr-defined]
+        now = datetime.now(tz=UTC)
+        repo.upsert_session_started("trend_s1", "trend-proj", "claude-sonnet-4-6", now - timedelta(days=1))
+        repo.insert_message(
+            "trend_m1",
+            "trend_s1",
+            now - timedelta(days=1),
+            "assistant",
+            "claude-sonnet-4-6",
+            100,
+            200,
+            0,
+            0,
+            0.01,
+            "trend",
+            False,
+        )
+        repo.insert_message(
+            "trend_m2",
+            "trend_s1",
+            now,
+            "assistant",
+            "claude-sonnet-4-6",
+            300,
+            400,
+            0,
+            0,
+            0.02,
+            "trend",
+            False,
+        )
+
+        r = c.get("/api/projects/trend-proj/trend?range=7d")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["name"] == "trend-proj"
+        assert len(body["data"]) == 7
+        assert sum(body["data"]) == 1000
+        projects = c.get("/api/projects?range=7d").json()
+        trend_project = next(p for p in projects if p["name"] == "trend-proj")
+        assert trend_project["trendData"] == body["data"]
+
+
+def test_waste_apply_confirm_appends_claude_md(tmp_path: Path) -> None:
+    from datetime import UTC, datetime
+
+    from tokenflow.adapters.persistence.repository import Repository
+
+    with TestClient(create_app()) as c:
+        repo: Repository = c.app.state.repo  # type: ignore[attr-defined]
+        now = datetime.now(tz=UTC)
+        repo.upsert_session_started("fix_s1", "fix-proj", "claude-sonnet-4-6", now)
+        repo.insert_event(
+            "fix_evt",
+            "fix_s1",
+            "SessionStart",
+            now,
+            {"hook_event_name": "SessionStart", "session_id": "fix_s1", "cwd": str(tmp_path)},
+            "fix_hash",
+        )
+        repo.insert_waste_pattern(
+            id="fix_w1",
+            kind="big-file-load",
+            severity="med",
+            title="Large file load",
+            meta="m",
+            body_html="b",
+            save_tokens=1000,
+            save_usd=0.01,
+            sessions=1,
+            session_id="fix_s1",
+            context="{}",
+            detected_at=now,
+        )
+
+        preview = c.post("/api/wastes/fix_w1/apply").json()
+        assert preview["preview"]["path"] == "CLAUDE.md"
+
+        r = c.post("/api/wastes/fix_w1/apply-confirm")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["applied"] is True
+        assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8").startswith("## Token Flow")
+
+        again = c.post("/api/wastes/fix_w1/apply-confirm")
+        assert again.status_code == 200
+        assert again.json()["applied"] is False
 
 
 def test_settings_crud_persists() -> None:
@@ -136,7 +234,6 @@ def test_api_key_roundtrip(tmp_path: Path) -> None:
         empty = c.get("/api/settings/api-key/status").json()
         assert empty["configured"] is False
         assert empty["valid"] is False
-        assert empty["backend"] in ("keyring", "file")
 
         r = c.post("/api/settings/api-key", json={"key": unique})
         assert r.status_code == 200
@@ -151,14 +248,10 @@ def test_api_key_roundtrip(tmp_path: Path) -> None:
         assert gone["valid"] is False
 
 
-def test_api_key_fallback_file_reports_invalid_when_no_keyring(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Force the no-keyring fallback path and verify corrupt secret.json reports as not-configured."""
+def test_api_key_corrupt_file_reports_not_configured(tmp_path: Path) -> None:
+    """Corrupt secret.json should report as not-configured, not crash."""
     from tokenflow.adapters.persistence import paths as paths_mod
-    from tokenflow.adapters.persistence import secret_store
 
-    monkeypatch.setattr(secret_store, "_keyring_available", lambda: False)
     secret = paths_mod.secret_path()
     secret.parent.mkdir(parents=True, exist_ok=True)
     secret.write_text("not-json-at-all", encoding="utf-8")
@@ -167,7 +260,6 @@ def test_api_key_fallback_file_reports_invalid_when_no_keyring(
         body = c.get("/api/settings/api-key/status").json()
         assert body["configured"] is False
         assert body["valid"] is False
-        assert body["backend"] == "file"
 
 
 def test_onboarding_status_and_complete(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -89,17 +89,17 @@ async def patch_tweaks(payload: TweaksPayload, repo: Repository = Depends(get_re
 
 @router.get("/settings/api-key/status")
 async def api_key_status() -> dict[str, Any]:
-    """Report presence + backend (keyring vs file) so the UI can surface it."""
+    """Report whether an API key is configured so the UI can surface it."""
     return secret_store.status()
 
 
 @router.post("/settings/api-key")
 async def set_api_key(payload: ApiKeyPayload) -> dict[str, Any]:
     try:
-        backend = secret_store.set_api_key(payload.key)
+        secret_store.set_api_key(payload.key)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    return {"configured": True, "backend": backend}
+    return {"configured": True}
 
 
 @router.delete("/settings/api-key")

@@ -21,10 +21,12 @@ class _AnalyticsMixin(_BaseRepo):
         prev_since = since - (now - since)
         today_tokens = self._sum_tokens_since(today_start)
         today_cost = self._sum_cost_since(today_start)
-        score = self._efficiency_score(since, now)
-        prev_score = self._efficiency_score(prev_since, since)
-        waste = self._waste_summary(since, now)
-        prev_waste = self._waste_summary(prev_since, since)
+        attribution = self._efficiency_attribution(since, now)
+        prev_attribution = self._efficiency_attribution(prev_since, since)
+        score = int(attribution["score"])
+        prev_score = int(prev_attribution["score"])
+        waste_pct = round(float(attribution["wasteRatio"]) * 100, 1)
+        prev_waste_pct = round(float(prev_attribution["wasteRatio"]) * 100, 1)
         current_session_tokens = 0
         current = self.get_current_session()  # type: ignore[attr-defined]
         if current:
@@ -37,11 +39,13 @@ class _AnalyticsMixin(_BaseRepo):
                 "score": score,
                 "delta": score - prev_score,
                 "series": self._efficiency_series(days=7),
+                "attribution": attribution,
             },
             "waste": {
-                "tokens": waste["tokens"],
-                "pct": waste["pct"],
-                "delta": round(waste["pct"] - prev_waste["pct"], 4),
+                "tokens": attribution["wastedTokens"],
+                "pct": waste_pct,
+                "delta": round(waste_pct - prev_waste_pct, 4),
+                "byKind": attribution["byKind"],
             },
             "window": window,
         }
@@ -76,19 +80,83 @@ class _AnalyticsMixin(_BaseRepo):
         )
         return int(rows[0][0]) if rows else 0
 
-    def _efficiency_score(self, start: datetime, end: datetime) -> int:
-        total = self._tokens_between(start, end)
-        if total <= 0:
-            return 100
-        wasted = min(total, self._waste_tokens_between(start, end))
-        opus_misuse = min(total, self._waste_tokens_between(start, end, "wrong-model"))
-        context_bloat = min(total, self._waste_tokens_between(start, end, "context-bloat"))
-        penalty = (
-            (wasted / total) * 40
-            + (opus_misuse / total) * 30
-            + (context_bloat / total) * 30
+    def _waste_rollup_between(self, start: datetime, end: datetime) -> dict[str, Any]:
+        rows = self._q(
+            """
+            SELECT kind,
+                   COUNT(*) AS findings,
+                   COALESCE(SUM(save_tokens), 0) AS tokens,
+                   COALESCE(SUM(save_usd), 0) AS usd
+            FROM tf_waste_patterns
+            WHERE detected_at >= ? AND detected_at < ?
+              AND dismissed_at IS NULL
+            GROUP BY kind
+            ORDER BY tokens DESC, usd DESC
+            """,
+            (start, end),
         )
-        return max(0, min(100, round(100 - penalty)))
+        by_kind = [
+            {
+                "kind": r[0],
+                "findings": int(r[1] or 0),
+                "tokens": int(r[2] or 0),
+                "usd": round(float(r[3] or 0), 4),
+            }
+            for r in rows
+        ]
+        totals = {str(item["kind"]): int(item["tokens"]) for item in by_kind}
+        return {
+            "total": sum(totals.values()),
+            "wrong-model": totals.get("wrong-model", 0),
+            "context-bloat": totals.get("context-bloat", 0),
+            "byKind": by_kind,
+        }
+
+    def _efficiency_score(self, start: datetime, end: datetime) -> int:
+        attribution = self._efficiency_attribution(start, end)
+        return int(attribution["score"])
+
+    def _efficiency_attribution(self, start: datetime, end: datetime) -> dict[str, Any]:
+        total = self._tokens_between(start, end)
+        waste_rollup = self._waste_rollup_between(start, end)
+        if total <= 0:
+            return {
+                "score": 100,
+                "totalTokens": 0,
+                "wastedTokens": 0,
+                "opusMisuseTokens": 0,
+                "contextBloatTokens": 0,
+                "wasteRatio": 0.0,
+                "opusMisuseRatio": 0.0,
+                "contextBloatRatio": 0.0,
+                "penalty": {"waste": 0.0, "opusMisuse": 0.0, "contextBloat": 0.0, "total": 0.0},
+                "byKind": waste_rollup["byKind"],
+            }
+        wasted = min(total, int(waste_rollup["total"]))
+        opus_misuse = min(total, int(waste_rollup["wrong-model"]))
+        context_bloat = min(total, int(waste_rollup["context-bloat"]))
+        waste_penalty = (wasted / total) * 40
+        opus_penalty = (opus_misuse / total) * 30
+        context_penalty = (context_bloat / total) * 30
+        total_penalty = waste_penalty + opus_penalty + context_penalty
+        score = max(0, min(100, round(100 - total_penalty)))
+        return {
+            "score": score,
+            "totalTokens": total,
+            "wastedTokens": wasted,
+            "opusMisuseTokens": opus_misuse,
+            "contextBloatTokens": context_bloat,
+            "wasteRatio": round(wasted / total, 4),
+            "opusMisuseRatio": round(opus_misuse / total, 4),
+            "contextBloatRatio": round(context_bloat / total, 4),
+            "penalty": {
+                "waste": round(waste_penalty, 1),
+                "opusMisuse": round(opus_penalty, 1),
+                "contextBloat": round(context_penalty, 1),
+                "total": round(total_penalty, 1),
+            },
+            "byKind": waste_rollup["byKind"],
+        }
 
     def _waste_summary(self, start: datetime, end: datetime) -> dict[str, Any]:
         total = self._tokens_between(start, end)
@@ -96,13 +164,60 @@ class _AnalyticsMixin(_BaseRepo):
         pct = (tokens / total) if total > 0 else 0.0
         return {"tokens": tokens, "pct": round(pct * 100, 1)}
 
+    def _waste_breakdown_by_kind(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
+        return list(self._waste_rollup_between(start, end)["byKind"])
+
     def _efficiency_series(self, *, days: int) -> list[int]:
         now = datetime.now(tz=UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        start = now - timedelta(days=days - 1)
+        token_rows = self._q(
+            """
+            SELECT CAST(date_trunc('day', ts) AS DATE) AS d,
+                   COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens
+            FROM tf_messages
+            WHERE ts >= ? AND ts < ? AND COALESCE(paused, FALSE) = FALSE
+            GROUP BY d
+            """,
+            (start, now + timedelta(days=1)),
+        )
+        waste_rows = self._q(
+            """
+            SELECT CAST(date_trunc('day', detected_at) AS DATE) AS d,
+                   kind,
+                   COALESCE(SUM(save_tokens), 0) AS tokens
+            FROM tf_waste_patterns
+            WHERE detected_at >= ? AND detected_at < ?
+              AND dismissed_at IS NULL
+            GROUP BY d, kind
+            """,
+            (start, now + timedelta(days=1)),
+        )
+        tokens_by_day = {
+            r[0].isoformat() if hasattr(r[0], "isoformat") else str(r[0]): int(r[1] or 0)
+            for r in token_rows
+        }
+        waste_by_day: dict[str, dict[str, int]] = {}
+        for day, kind, tokens in waste_rows:
+            key = day.isoformat() if hasattr(day, "isoformat") else str(day)
+            waste_by_day.setdefault(key, {})[str(kind)] = int(tokens or 0)
+
         out: list[int] = []
         for offset in range(days - 1, -1, -1):
-            start = now - timedelta(days=offset)
-            end = start + timedelta(days=1)
-            out.append(self._efficiency_score(start, end))
+            day = (now - timedelta(days=offset)).date().isoformat()
+            total = tokens_by_day.get(day, 0)
+            if total <= 0:
+                out.append(100)
+                continue
+            wastes = waste_by_day.get(day, {})
+            wasted = min(total, sum(wastes.values()))
+            opus_misuse = min(total, wastes.get("wrong-model", 0))
+            context_bloat = min(total, wastes.get("context-bloat", 0))
+            penalty = (
+                (wasted / total) * 40
+                + (opus_misuse / total) * 30
+                + (context_bloat / total) * 30
+            )
+            out.append(max(0, min(100, round(100 - penalty))))
         return out
 
     def _sum_tokens_since(self, since: datetime) -> int:
@@ -240,7 +355,7 @@ class _AnalyticsMixin(_BaseRepo):
     def projects(self, range_: str = "7d") -> list[dict[str, Any]]:
         days = 30 if range_ == "30d" else 7
         since = datetime.now(tz=UTC).timestamp() - days * 86400
-        rows = self._q(
+        summary_rows = self._q(
             """
             SELECT s.project_slug,
                    COUNT(DISTINCT s.session_id) AS sess,
@@ -254,17 +369,70 @@ class _AnalyticsMixin(_BaseRepo):
             """,
             (since,),
         )
+        trend_map = self._project_trends(range_)
         out: list[dict[str, Any]] = []
-        for name, sess, toks, cost in rows:
+        for name, sess, toks, cost in summary_rows:
+            trend_data = trend_map.get(str(name), [0] * days)
+            midpoint = max(1, len(trend_data) // 2)
+            earlier = sum(trend_data[:midpoint])
+            later = sum(trend_data[midpoint:])
+            trend = "flat"
+            if later > earlier * 1.1:
+                trend = "up"
+            elif earlier > later * 1.1:
+                trend = "down"
             out.append({
                 "name": name,
                 "tokens": int(toks),
                 "cost": round(float(cost), 2),
                 "sessions": int(sess),
                 "waste": 0.0,
-                "trend": "flat",
+                "trend": trend,
+                "trendData": trend_data,
                 "range": range_,
             })
+        return out
+
+    def project_trend(self, name: str, range_: str = "7d") -> dict[str, Any]:
+        days = 30 if range_ == "30d" else 7
+        return {"name": name, "range": range_, "data": self._project_trends(range_, project=name).get(name, [0] * days)}
+
+    def project_exists(self, name: str) -> bool:
+        rows = self._q("SELECT 1 FROM sessions WHERE project_slug = ? LIMIT 1", (name,))
+        return bool(rows)
+
+    def _project_trends(self, range_: str = "7d", project: str | None = None) -> dict[str, list[int]]:
+        days = 30 if range_ == "30d" else 7
+        since = datetime.now(tz=UTC).timestamp() - days * 86400
+        params: list[Any] = [since]
+        project_filter = ""
+        if project:
+            project_filter = "AND s.project_slug = ?"
+            params.append(project)
+        rows = self._q(
+            f"""
+            SELECT s.project_slug,
+                   date_trunc('day', m.ts) AS d,
+                   COALESCE(SUM(m.input_tokens + m.output_tokens), 0) AS toks
+            FROM tf_messages m
+            JOIN sessions s ON s.session_id = m.session_id
+            WHERE m.ts >= to_timestamp(?)
+              AND COALESCE(m.paused, FALSE) = FALSE
+              {project_filter}
+            GROUP BY s.project_slug, d
+            ORDER BY s.project_slug, d
+            """,
+            tuple(params),
+        )
+        now = datetime.now(tz=UTC)
+        start = now.timestamp() - days * 86400
+        out: dict[str, list[int]] = {}
+        for project, day, toks in rows:
+            buckets = out.setdefault(str(project), [0] * days)
+            day_ts = day.timestamp() if isinstance(day, datetime) else float(day)
+            idx = int((day_ts - start) / 86400)
+            if 0 <= idx < days:
+                buckets[idx] += int(toks or 0)
         return out
 
     # ---------- Analytics page ----------
