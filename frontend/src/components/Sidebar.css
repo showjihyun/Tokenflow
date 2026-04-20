@@ -1,0 +1,119 @@
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  height: 48px;
+}
+
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--amber) 0%, var(--red) 100%);
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+}
+
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 3px;
+  background: var(--bg-1);
+  clip-path: polygon(0 40%, 25% 30%, 45% 60%, 70% 20%, 100% 50%, 100% 100%, 0 100%);
+}
+
+.brand-name {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.brand-dot {
+  color: var(--amber);
+}
+
+.nav {
+  padding: 8px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-group-label {
+  padding: 12px 10px 6px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-3);
+  font-weight: 500;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  color: var(--fg-1);
+  font-size: 13px;
+  width: 100%;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--fg-0);
+}
+
+.nav-item.active {
+  background: var(--bg-2);
+  color: var(--fg-0);
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px 12px;
+}
+
+.budget-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.budget-mini-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--fg-2);
+}
+
+.budget-mini-bar {
+  height: 4px;
+  background: var(--bg-3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.budget-mini-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--amber) 70%, var(--red));
+  border-radius: 2px;
+  transition: width 0.2s;
+}
+
+.budget-mini-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+}

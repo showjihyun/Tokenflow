@@ -1,0 +1,84 @@
+[project]
+name = "tokenflow"
+version = "0.1.0"
+description = "Personal Claude Code token tracker, analyzer, and coach — local-first web dashboard."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Token Flow contributors" }]
+keywords = ["claude-code", "claude", "anthropic", "token", "cost", "duckdb", "dashboard"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: System :: Monitoring",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.30",
+    "duckdb>=1.0",
+    "watchdog>=4.0",
+    "typer>=0.12",
+    "rich>=13.0",
+    "anthropic>=0.35",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+tokenflow = "tokenflow.harness.main:app"
+tokenflow-hook = "tokenflow.harness.hook_main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tokenflow"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"migrations" = "tokenflow/_migrations"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's Depends()/Query() etc. are intentionally used as default args.
+"tokenflow/adapters/web/routes/*.py" = ["B008"]
+# Typer's typer.Option() is its documented idiom for CLI defaults.
+"tokenflow/harness/main.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

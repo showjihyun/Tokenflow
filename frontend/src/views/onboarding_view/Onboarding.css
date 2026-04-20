@@ -1,0 +1,120 @@
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in oklch, var(--bg-0) 92%, transparent);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 40px 20px;
+}
+
+.onboarding-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-lg);
+  max-width: 560px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.onboarding-header {
+  padding: 28px 28px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.onboarding-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.onboarding-brand .mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--amber) 0%, var(--red) 100%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+}
+
+.onboarding-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.onboarding-stepper {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.onboarding-stepper .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bg-3);
+}
+
+.onboarding-stepper .dot.active {
+  background: var(--amber);
+}
+
+.onboarding-stepper .dot.done {
+  background: var(--green);
+}
+
+.onboarding-body {
+  padding: 24px 28px;
+  min-height: 220px;
+}
+
+.onboarding-step-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.onboarding-step-sub {
+  color: var(--fg-2);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+
+.onboarding-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.onboarding-status-row[data-tone="ok"] {
+  border-color: color-mix(in oklch, var(--green) 40%, transparent);
+}
+
+.onboarding-status-row[data-tone="warn"] {
+  border-color: color-mix(in oklch, var(--amber) 40%, transparent);
+}
+
+.onboarding-footer {
+  padding: 16px 28px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.onboarding-input {
+  margin-top: 8px;
+}

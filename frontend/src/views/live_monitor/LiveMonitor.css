@@ -1,0 +1,257 @@
+.lm-ring-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lm-ring-center {
+  position: relative;
+}
+
+.lm-ring-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.lm-ring-pct {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-family: var(--font-mono);
+}
+
+.lm-ring-lbl {
+  font-size: 10px;
+  color: var(--fg-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lm-ring-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lm-ring-info .lbl {
+  font-size: 11px;
+  color: var(--fg-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lm-ring-info .sub {
+  font-size: 11px;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+}
+
+.lm-tip {
+  font-size: 12px;
+  color: var(--fg-2);
+  line-height: 1.55;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+}
+
+.lm-tip code {
+  font-family: var(--font-mono);
+  background: var(--bg-3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11.5px;
+}
+
+/* Model distribution */
+.lm-model-bar {
+  height: 10px;
+  display: flex;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.lm-model-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Budget */
+.lm-budget-track {
+  position: relative;
+  height: 22px;
+  background: var(--bg-3);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.lm-budget-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--green);
+  opacity: 0.9;
+}
+
+.lm-budget-forecast {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--amber) 0 4px,
+    transparent 4px 8px
+  );
+  opacity: 0.9;
+}
+
+.lm-budget-limit {
+  position: absolute;
+  left: 100%;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--red);
+}
+
+.lm-budget-marks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+}
+
+.lm-budget-alert {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--amber-w);
+  border: 1px solid color-mix(in oklch, var(--amber) 30%, transparent);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--amber);
+  display: flex;
+  gap: 8px;
+}
+
+.lm-budget-alert .body {
+  color: var(--fg-1);
+}
+
+/* Activity ticker */
+.lm-ticker-empty {
+  padding: 20px;
+  color: var(--fg-3);
+  font-size: 12px;
+  text-align: center;
+}
+
+.lm-ticker-row {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  animation: lm-ticker-in 200ms ease-out;
+}
+
+@keyframes lm-ticker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.lm-ticker-time {
+  font-family: var(--font-mono);
+  color: var(--fg-3);
+  font-size: 10.5px;
+  min-width: 60px;
+}
+
+.lm-ticker-label {
+  flex: 1;
+  color: var(--fg-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.lm-ticker-tk {
+  font-family: var(--font-mono);
+  color: var(--fg-2);
+  font-size: 11px;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Projects table */
+.lm-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.lm-tbl th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-3);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-1);
+}
+
+.lm-tbl td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--fg-1);
+  vertical-align: middle;
+}
+
+.lm-tbl tr:hover td {
+  background: var(--bg-hover);
+}
+
+.lm-tbl td.num {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  text-align: right;
+  color: var(--fg-0);
+}
+
+.lm-tbl .waste-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lm-tbl .project-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lm-tbl .project-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}

@@ -1,0 +1,97 @@
+.settings-label {
+  font-size: 11px;
+  color: var(--fg-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.settings-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+}
+
+.settings-input input {
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--fg-0);
+  font-size: 14px;
+  width: 100%;
+  font-family: var(--font-mono);
+}
+
+.settings-input input:focus {
+  outline: none;
+}
+
+.settings-input-prefix {
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+}
+
+.settings-help {
+  font-size: 11px;
+  color: var(--fg-3);
+  margin-top: 6px;
+}
+
+.settings-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+
+.settings-radio {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-radio button {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  color: var(--fg-2);
+  font-size: 13px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-radio button.active {
+  background: var(--bg-3);
+  border-color: var(--amber);
+  color: var(--fg-0);
+}
+
+.settings-radio .name {
+  font-weight: 500;
+}
+
+.settings-radio .desc {
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.settings-badge-v2 {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-3);
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  margin-left: 8px;
+}

@@ -1,0 +1,114 @@
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-2);
+  font-size: 12.5px;
+}
+
+.crumbs .sep {
+  color: var(--fg-3);
+}
+
+.crumbs .cur {
+  color: var(--fg-0);
+  font-weight: 500;
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.range-picker {
+  display: flex;
+  background: var(--bg-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 2px;
+  gap: 1px;
+}
+
+.range-picker button {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  color: var(--fg-2);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+
+.range-picker button.active {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+
+.icon-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  color: var(--fg-2);
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.icon-btn:hover {
+  background: var(--bg-2);
+  color: var(--fg-0);
+}
+
+/* Connection pill — ok / stale / disconnected */
+.connection-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  border: 1px solid transparent;
+}
+
+.connection-pill[data-status="ok"] {
+  background: var(--green-w);
+  border-color: color-mix(in oklch, var(--green) 35%, transparent);
+  color: var(--green);
+}
+
+.connection-pill[data-status="stale"] {
+  background: var(--amber-w);
+  border-color: color-mix(in oklch, var(--amber) 35%, transparent);
+  color: var(--amber);
+}
+
+.connection-pill[data-status="disconnected"] {
+  background: var(--red-w);
+  border-color: color-mix(in oklch, var(--red) 35%, transparent);
+  color: var(--red);
+}
+
+.connection-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.connection-pill[data-status="ok"] .connection-dot {
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 1.6s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}

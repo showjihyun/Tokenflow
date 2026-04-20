@@ -1,0 +1,93 @@
+.tweaks {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 300px;
+  max-height: 70vh;
+  background: var(--bg-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-lg);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tweaks.open {
+  display: flex;
+}
+
+.tweaks-head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tweaks-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-1);
+}
+
+.tweaks-body {
+  padding: 12px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tweak-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tweak-label {
+  font-size: 11px;
+  color: var(--fg-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tweak-opts {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tweak-opts button {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  color: var(--fg-2);
+  font-size: 11px;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.tweak-opts button.active {
+  background: var(--bg-3);
+  color: var(--fg-0);
+  border-color: var(--border-strong);
+}
+
+.tweak-opts button:hover {
+  color: var(--fg-0);
+}
+
+.tweaks-foot {
+  font-size: 10.5px;
+  color: var(--fg-3);
+  text-align: center;
+  padding: 4px 0;
+}

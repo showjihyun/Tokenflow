@@ -1,0 +1,21 @@
+/* Light theme override — only lightness inverts, hue preserved. */
+
+:root[data-theme="light"] {
+  --bg-0: oklch(0.985 0.003 260);
+  --bg-1: oklch(0.965 0.004 260);
+  --bg-2: oklch(0.945 0.005 260);
+  --bg-3: oklch(0.920 0.006 260);
+  --bg-hover: oklch(0.935 0.006 260);
+  --border-subtle: oklch(0.90 0.006 260);
+  --border-default: oklch(0.84 0.008 260);
+  --border-strong: oklch(0.72 0.010 260);
+  --fg-0: oklch(0.20 0.012 260);
+  --fg-1: oklch(0.38 0.012 260);
+  --fg-2: oklch(0.55 0.012 260);
+  --fg-3: oklch(0.65 0.012 260);
+  --amber-w: oklch(0.94 0.05 62);
+  --green-w: oklch(0.94 0.05 158);
+  --red-w: oklch(0.94 0.06 28);
+  --blue-w: oklch(0.94 0.05 240);
+  --violet-w: oklch(0.94 0.06 300);
+}

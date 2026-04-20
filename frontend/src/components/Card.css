@@ -1,0 +1,100 @@
+.card {
+  background: var(--bg-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 12px;
+}
+
+.card-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--fg-1);
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.card-sub {
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.card-body {
+  padding: 16px;
+}
+
+.card-body.flush {
+  padding: 0;
+}
+
+.app[data-density="compact"] .card-body {
+  padding: 12px;
+}
+
+.app[data-density="roomy"] .card-body {
+  padding: 20px;
+}
+
+/* Row helpers (page-level grid) */
+.row {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.row-2 {
+  grid-template-columns: 2fr 1fr;
+}
+.row-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.row-21 {
+  grid-template-columns: 2fr 1fr;
+}
+.row-12 {
+  grid-template-columns: 1fr 2fr;
+}
+
+.hstack {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vstack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.spread {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.hr {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 12px 0;
+  border: 0;
+}
+
+@media (max-width: 1279px) {
+  .row-2,
+  .row-21,
+  .row-12 {
+    grid-template-columns: 1fr;
+  }
+  .row-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+}

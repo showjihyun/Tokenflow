@@ -1,0 +1,81 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  border: 1px solid transparent;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.badge.opus {
+  color: var(--violet);
+  background: var(--violet-w);
+  border-color: color-mix(in oklch, var(--violet) 30%, transparent);
+}
+.badge.opus .dot {
+  background: var(--violet);
+}
+
+.badge.sonnet {
+  color: var(--amber);
+  background: var(--amber-w);
+  border-color: color-mix(in oklch, var(--amber) 30%, transparent);
+}
+.badge.sonnet .dot {
+  background: var(--amber);
+}
+
+.badge.haiku {
+  color: var(--blue);
+  background: var(--blue-w);
+  border-color: color-mix(in oklch, var(--blue) 30%, transparent);
+}
+.badge.haiku .dot {
+  background: var(--blue);
+}
+
+.badge.good {
+  color: var(--green);
+  background: var(--green-w);
+  border-color: color-mix(in oklch, var(--green) 30%, transparent);
+}
+.badge.good .dot {
+  background: var(--green);
+}
+
+.badge.warn {
+  color: var(--amber);
+  background: var(--amber-w);
+  border-color: color-mix(in oklch, var(--amber) 30%, transparent);
+}
+.badge.warn .dot {
+  background: var(--amber);
+}
+
+.badge.danger {
+  color: var(--red);
+  background: var(--red-w);
+  border-color: color-mix(in oklch, var(--red) 30%, transparent);
+}
+.badge.danger .dot {
+  background: var(--red);
+}
+
+.badge.neutral {
+  color: var(--fg-2);
+  background: var(--bg-2);
+  border-color: var(--border-subtle);
+}
+.badge.neutral .dot {
+  background: var(--fg-3);
+}
