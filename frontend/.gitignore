@@ -1,5 +1,8 @@
 node_modules/
 dist/
+playwright-report/
+playwright-report-real/
+test-results/
 *.log
 .vite/
 .DS_Store

@@ -99,7 +99,19 @@
       "Bash(rm -rf /tmp/tf-demo)",
       "Bash(mkdir -p /tmp/tf-demo)",
       "Bash(TOKENFLOW_HOME=/tmp/tf-demo .venv/Scripts/tokenflow.exe serve --host 127.0.0.1 --port 8765)",
-      "Bash(echo \"PID $!\")"
+      "Bash(echo \"PID $!\")",
+      "Bash(unset TOKENFLOW_HOME)",
+      "Bash(curl -s \"http://127.0.0.1:8765/api/sessions/current\")",
+      "Bash(curl -s \"http://127.0.0.1:8765/api/kpi/models\")",
+      "Bash(curl -s \"http://127.0.0.1:8765/api/projects?range=7d\")",
+      "Bash(curl -s \"http://127.0.0.1:8765/api/sessions?limit=20\")",
+      "Bash(where tokenflow-hook *)",
+      "Bash(cp ~/.claude/settings.json ~/.claude/settings.json.bak)",
+      "Bash(python -c ' *)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_phase_d_routes.py::test_onboarding_status_and_complete -v)",
+      "Bash(curl -s \"http://127.0.0.1:8765/api/sessions?limit=5\")",
+      "Bash(mkdir -p \"C:/tmp/tf-scenario\")",
+      "Bash(curl -s \"http://127.0.0.1:8765/api/kpi/summary?window=today\")"
     ]
   }
 }

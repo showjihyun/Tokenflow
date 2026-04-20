@@ -22,6 +22,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    exclude: ["e2e/**", "e2e-real/**", "node_modules/**", "dist/**"],
     deps: {
       optimizer: {
         web: { enabled: false },

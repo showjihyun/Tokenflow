@@ -35,7 +35,7 @@ export function AreaChart({ series, width = 800, height = 220, labels = [] }: Ar
   }
 
   const maxY = Math.max(1, ...stacked.map((col) => col[col.length - 1]!.top));
-  const x = (i: number) => padX + (i / (N - 1)) * W;
+  const x = (i: number) => padX + (N === 1 ? W / 2 : (i / (N - 1)) * W);
   const y = (v: number) => padY + H - (v / maxY) * H;
 
   const areas = series.map((s, si) => {
