@@ -11,8 +11,25 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-HOOK_COMMAND = "tokenflow-hook"
+HOOK_COMMAND_NAME = "tokenflow-hook"
 HOOK_EVENTS: tuple[str, ...] = ("SessionStart", "PostToolUse", "SessionEnd", "UserPromptSubmit")
+
+
+def resolve_hook_command() -> str:
+    """Return an absolute path to ``tokenflow-hook`` when we can find it,
+    otherwise fall back to the bare name.
+
+    Claude Code launches hooks outside of the venv, so a bare ``tokenflow-hook``
+    only works when the venv's Scripts/bin dir is on the user's PATH. Baking in
+    the absolute path at install time avoids silent "command not found" failures
+    that look to the user like "tracking is broken".
+    """
+    located = shutil.which(HOOK_COMMAND_NAME)
+    return located if located else HOOK_COMMAND_NAME
+
+
+# Backward-compatible alias: existing code (and `_has_our_hook`) matches on substring.
+HOOK_COMMAND = HOOK_COMMAND_NAME
 
 
 def claude_settings_path() -> Path:
@@ -95,7 +112,7 @@ def install_hook(settings_path: Path | None = None, dry_run: bool = False) -> di
             continue
         buckets.append({
             "matcher": "" if ev != "PostToolUse" else ".*",
-            "hooks": [{"type": "command", "command": HOOK_COMMAND}],
+            "hooks": [{"type": "command", "command": resolve_hook_command()}],
         })
         hooks[ev] = buckets
         added.append(ev)
