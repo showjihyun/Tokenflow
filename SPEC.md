@@ -100,7 +100,7 @@ Token Flow = ccprophet 코어 흡수 + 새 UI.
 | Backend | Python 3.11 + FastAPI | |
 | ASGI | uvicorn | |
 | DB | DuckDB (임베디드) | |
-| Transcript watch | watchdog | |
+| Transcript watch | byte-offset polling tailer | watchdog 전환은 v1.1 후보 |
 | Frontend | React 18 + TypeScript strict | |
 | Build | Vite | |
 | Styling | CSS Variables + CSS Modules | Tailwind 없이 |
@@ -111,8 +111,8 @@ Token Flow = ccprophet 코어 흡수 + 새 UI.
 | Icons | Lucide React | |
 | AI Coach LLM | Claude Sonnet 4.6 | |
 | Test | pytest + vitest + @testing-library/react | |
-| Lint | ruff + mypy strict + eslint + prettier | |
-| 패키징 | uv + pnpm | |
+| Lint | ruff + mypy strict + eslint | prettier 는 현재 미도입 |
+| 패키징 | uv + npm | frontend 는 `package-lock.json` 기준 |
 | 배포 | 로컬 실행만 | |
 
 ---
@@ -142,7 +142,7 @@ Token Flow = ccprophet 코어 흡수 + 새 UI.
 │  │  domain/  (entities, values, services)            │    │
 │  └───────────────────────────────────────────────────┘    │
 │  Storage: ~/.tokenflow/events.duckdb                       │
-│           OS keyring or ~/.tokenflow/secret.json fallback  │
+│           ~/.tokenflow/secret.json  (API key, 0600)        │
 │           ~/.tokenflow/events.ndjson (hook append log)     │
 │           ~/.tokenflow/logs/                                │
 └───────────────────────────────────────────────────────────┘
@@ -229,7 +229,7 @@ Claude Code 훅 payload 에 **토큰 카운트 없음** (공식 문서 확인). 
 **Step 3 — Claude API 키 입력 (선택)**
 - Coach / LLM better prompt 기능은 API 키 필요
 - `Add later` 로 건너뛰면 해당 뷰는 read-only 배너 표시
-- 입력 시 OS keyring 을 우선 사용하고, keyring backend 가 없으면 `~/.tokenflow/secret.json` 에 0600 권한으로 저장한다. 현재 구현은 저장 여부만 확인하며 즉시 API ping test 는 하지 않는다.
+- 입력 시 `~/.tokenflow/secret.json` 에 0600 권한으로 저장한다. 현재 구현은 저장 여부만 확인하며 즉시 API ping test 는 하지 않는다.
 
 **Step 4 — ccprophet DB 후보 감지**
 - `~/.claude-prophet/events.duckdb` 가 존재하면 자동 감지
@@ -472,7 +472,7 @@ Output: a rewritten query only (no explanation).
 **섹션**:
 1. **Monthly budget** — Hard limit + Alert thresholds (50/75/90%). "Hard block · v2" 배지
 2. **Model routing rules** — 조건→모델 매핑, 토글, Add rule
-3. **Notifications** — 6종 토글
+3. **Notifications** — 8종 토글
    - In-app: 항상 가능
    - System: 브라우저 Notification API 지원/권한 상태에 따라 토글 가능 여부를 제어
 4. **Better prompt mode** — static / llm. 서버 `tf_config.better_prompt_mode` 에 영속하며 API 경로는 `/settings/tweaks`
@@ -531,18 +531,18 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | GET | `/kpi/summary?window=today\|7d\|30d` | |
 | GET | `/kpi/models` | 모델별 오늘 token/cost/share |
 | GET | `/kpi/budget` | 월 예산, 사용액, forecast, Opus share |
-| GET | `/analytics/kpi?range=7d` | 분석 KPI summary |
-| GET | `/analytics/daily?range=30d` | stacked area |
-| GET | `/analytics/heatmap?range=7d` | 히트맵 |
-| GET | `/analytics/cost-breakdown?range=30d` | 비용 분해 |
-| GET | `/analytics/top-wastes?range=30d&limit=4` | `tf_waste_patterns` 기반 top patterns. range 내 kind별 aggregate 후 severity → save_usd → save_tokens → detected_at 순 정렬 |
+| GET | `/analytics/kpi?range=7d&project=` | 분석 KPI summary |
+| GET | `/analytics/daily?range=30d&project=` | stacked area |
+| GET | `/analytics/heatmap?range=7d&project=` | 히트맵 |
+| GET | `/analytics/cost-breakdown?range=30d&project=` | 비용 분해 |
+| GET | `/analytics/top-wastes?range=30d&limit=4&project=` | `tf_waste_patterns` 기반 top patterns. range/project 내 kind별 aggregate 후 severity → save_usd → save_tokens → detected_at 순 정렬 |
 
 ### 8.3 Waste
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/wastes?status=active\|dismissed` | |
 | POST | `/wastes/{id}/dismiss` | |
-| POST | `/wastes/{id}/apply` | |
+| POST | `/wastes/{id}/apply` | outcome + CLAUDE.md/routing diff preview |
 | POST | `/wastes/scan?session_id=` | 특정 세션 또는 현재 범위 waste 탐지 |
 | POST | `/wastes/sweep` | hourly sweep 과 동일한 전체 탐지 |
 
@@ -615,7 +615,7 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 **A. Hook events**:
 1. Claude Code → hook → stdin JSON
 2. `tokenflow-hook` → `~/.tokenflow/events.ndjson` append
-3. FastAPI `EventTailer` (watchdog) → DuckDB `events` + asyncio PubSub
+3. FastAPI `EventTailer` (polling tailer) → DuckDB `events` + asyncio PubSub
 4. SSE 브로드캐스트
 
 **B. Transcript tail**:
@@ -664,7 +664,7 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 ### 10.3 보안
 - CLI 기본 bind host 는 `127.0.0.1`
 - CORS 허용 origin 은 현재 `http://localhost:5173`, `http://127.0.0.1:5173`
-- API 키는 OS keyring 을 우선 사용한다. keyring backend 가 없으면 `~/.tokenflow/secret.json` fallback 을 사용하고 0600 권한을 best-effort 로 적용한다.
+- API 키는 `~/.tokenflow/secret.json` 에 저장하고 0600 권한을 best-effort 로 적용한다.
 - `.gitignore` 에 `.tokenflow/` 기본 포함
 
 ### 10.4 에러 taxonomy (UI 노출)
@@ -680,7 +680,7 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | DuckDB 락/오류 | Topbar 에러 배너 "DB unavailable" | 자동 재시도 5초 |
 | Disk 사용 > 90% | Topbar 경고 "Disk almost full", "Vacuum now" CTA | Insert 계속 시도 |
 | Migration 실패 | 서버 기동 중단, 자동 백업 복원 시도, 로그 `~/.tokenflow/logs/migration_failed.log` | 사용자 수동 개입 |
-| API 키 파일 권한 0600 아님 | fallback 파일 저장 시 best-effort chmod | 실패 시 keyring 또는 미설정 상태 유지 |
+| API 키 파일 권한 0600 아님 | 파일 저장 시 best-effort chmod | 실패 시 저장은 유지하되 health/status 에서 점검 가능 |
 
 ### 10.5 관측성
 - `~/.tokenflow/logs/` 회전 로그 (7일)
@@ -697,7 +697,7 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 ## 11. 결정된 사항 (v0.2+v0.3)
 
 1. AI Coach LLM → **Claude Sonnet 4.6**
-2. API 키 저장 → OS keyring 우선, keyring 미사용 가능 환경에서는 평문 `~/.tokenflow/secret.json` fallback (0600 best-effort)
+2. API 키 저장 → 평문 `~/.tokenflow/secret.json` (0600 best-effort)
 3. Coach 컨텍스트 주입 → 토큰·비용·모델·waste·프로젝트명·파일 basename 만
 4. Hard budget limit 차단 → v1 알림만, v2 proxy 차단
 5. Better prompt → **사용자 선택** (static / llm). 기본 static
@@ -708,7 +708,7 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 10. ccprophet DB import → **v1 포함**, CLI + REST background job/status API 구현
 11. Waste 탐지 → `/wastes/scan`, `/wastes/sweep` API 로 실행. SessionEnd 자동 평가는 추적 항목
 12. Better prompt LLM 템플릿 → §6.5 프롬프트 템플릿 고정
-13. Efficiency Score 포뮬러 → §5.3 정의
+13. Efficiency Score 포뮬러 → `tf_messages` + `tf_waste_patterns` 기반 실제 계산 구현
 14. Query Quality Score 포뮬러 → §5.3 정의
 15. Opus overuse 임계값 → 월 비용 점유율 15%(권장), 25%(알림 발생)
 16. DB retention → 180일 상세 보관 + `daily_aggregate` rollup 구현. 장기 analytics 에 rollup 을 병합하는 것은 추가 개선
@@ -725,15 +725,20 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 
 | 항목 | 현재 구현 | SPEC 우선 판단 |
 |---|---|---|
-| API 키 상태 판정 | `/settings/api-key/status`, `/system/health`, `/onboarding/status` 모두 `secret_store.status()` 기반 | 완료. keyring 우선 정책 유지 |
+| API 키 상태 판정 | `/settings/api-key/status`, `/system/health`, `/onboarding/status` 모두 `secret_store.status()` 기반 | 완료. 파일 저장 정책 기준 |
 | Hook stale 판정 | 마지막 DB event 시각 기준 `ok` / `stale`(>10분) / `disconnected` 반환 | 완료. 설치 여부와 연결 상태의 세분화는 추가 개선 가능 |
+| Session inactivity 종료 | 활성 세션의 마지막 event/message 가 15분 이상 없으면 polling tailer 가 `ended_at` 을 기록 | 완료. inactivity 종료 사유의 영구 event 기록은 추가 개선 |
 | Flow chart 채널 | `/sessions/current/flow/stream` SSE snapshot/invalidation + REST fallback | 완료. `Last-Event-ID` replay 는 EventBus 정책을 따른다 |
 | Import UX | CLI import + REST background job/status API, Settings Data 카드 job 상태 표시 구현 | 완료. 더 자세한 progress bar 는 추가 개선 |
 | 마이그레이션 안전성 | pending migration 적용 전 DB backup 생성 | 1차 완료. 실패 로그/자동 복원은 추가 개선 |
 | Retention/Vacuum | 앱 시작 및 `/system/vacuum` 에서 180일 retention + `daily_aggregate` rollup 수행, `/system/backups` 구현 | 완료. rollup 기반 장기 analytics 활용은 추가 개선 |
-| Top waste analytics | `/analytics/top-wastes` 가 `tf_waste_patterns` 실제 데이터에서 range/limit 기준 kind별 aggregate ranking 반환, Usage Analytics 카드 연결 | 완료. 프로젝트/세션 drill-down 은 추가 개선 |
+| Live KPI efficiency/waste | `tf_messages` 총 토큰과 `tf_waste_patterns.save_tokens` 기반 Efficiency Score / Wasted Tokens 계산 | 완료. 더 정교한 waste attribution 은 추가 개선 |
+| Usage Analytics project filter | KPI/daily/heatmap/cost/top-wastes API와 UI project dropdown 연결 | 완료. 프로젝트별 trend 정밀화는 추가 개선 |
+| Top waste analytics | `/analytics/top-wastes` 가 `tf_waste_patterns` 실제 데이터에서 range/limit/project 기준 kind별 aggregate ranking 반환, Usage Analytics 카드 연결 | 완료. 세션 drill-down 은 추가 개선 |
+| Waste apply preview | `/wastes/{id}/apply` 가 outcome 과 CLAUDE.md/routing diff preview 를 반환하고 UI에 표시 | 완료. 실제 파일 패치 적용은 v1 범위 밖 |
 | Pause tracking / Export session | pause flag API, paused hook marker, transcript message `paused` marker, 분석/list/replay/export 기본 제외, `include_paused=true` forensic 조회 지원 | 완료. pause 기간 UX 표시는 추가 개선 |
 | Query Quality Score API | `/coach/query-quality` 정적 scoring API 구현 | 완료. UI 노출은 추가 개선 |
+| Bell notification center | Topbar Bell 최근 10개 in-app 알림 + Clear all 구현 | 완료. persisted notification history 는 추가 개선 |
 | System notifications | in-app/system preference, 브라우저 Notification 지원/권한 플로우, waste, SessionEnd, budget threshold, context saturation, Opus overuse, API error 이벤트 연결 | 완료. 더 세밀한 알림 빈도 제어는 추가 개선 |
 
 ---

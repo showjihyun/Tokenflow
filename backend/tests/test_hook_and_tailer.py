@@ -114,7 +114,7 @@ def test_event_tailer_processes_ndjson(tmp_path: Path) -> None:
             "session_id": "s_tailer",
             "cwd": str(tmp_path),
             "model": "claude-sonnet-4-6",
-            "_received_at": 1.0,
+            "_received_at": datetime.now(tz=UTC).timestamp(),
         }) + "\n",
         encoding="utf-8",
     )

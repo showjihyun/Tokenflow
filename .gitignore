@@ -19,6 +19,9 @@ pip-wheel-metadata/
 node_modules/
 *.log
 .vite/
+*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js
 
 # Token Flow local state
 .tokenflow/
