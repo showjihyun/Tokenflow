@@ -23,6 +23,10 @@ node_modules/
 # Token Flow local state
 .tokenflow/
 ~/.tokenflow/
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+*.bak.*
 
 # Editors
 .vscode/

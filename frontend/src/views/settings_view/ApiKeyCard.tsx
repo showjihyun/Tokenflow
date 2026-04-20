@@ -30,12 +30,17 @@ export function ApiKeyCard() {
       <CardHeader title="Claude API key" icon={<Key size={13} strokeWidth={1.6} />} />
       <CardBody>
         <div className="settings-help" style={{ marginBottom: 10 }}>
-          AI Coach · LLM better prompt 에 필요합니다. 키는 <code>~/.tokenflow/secret.json</code> 에 0600 권한으로 저장됩니다.
+          AI Coach · LLM better prompt 에 필요합니다.{" "}
+          {data?.backend === "keyring" ? (
+            <>키는 OS 자격증명 저장소 (Windows Credential Manager / macOS Keychain / Secret Service) 에 저장됩니다.</>
+          ) : (
+            <>키는 <code>~/.tokenflow/secret.json</code> 에 0600 권한으로 저장됩니다 (keyring backend 없음).</>
+          )}
         </div>
         {configured && valid && (
           <div className="settings-toggle-row">
             <span style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--green)" }}>
-              <Check size={14} strokeWidth={1.8} /> configured
+              <Check size={14} strokeWidth={1.8} /> configured · {data?.backend}
             </span>
             <Button variant="ghost" size="sm" onClick={() => del.mutate()} disabled={del.isPending}>
               <Trash2 size={12} strokeWidth={1.8} /> Remove

@@ -20,9 +20,11 @@ DEFAULT_TEMPLATE = "Be more specific: state the goal + expected output format + 
 
 
 def static_suggestion(waste_kind: str | None, *, file_path: str | None = None) -> tuple[str, int]:
+    # `<pattern>` stays as a literal placeholder for the user to fill in; only `<basename>`
+    # can be derived here from the hook's file_path.
     base = STATIC_TEMPLATES.get(waste_kind or "", DEFAULT_TEMPLATE)
     if file_path:
-        base = base.replace("<basename>", os.path.basename(file_path)).replace("<pattern>", "<pattern>")
+        base = base.replace("<basename>", os.path.basename(file_path))
     return base, 3000  # arbitrary est savings for static case
 
 

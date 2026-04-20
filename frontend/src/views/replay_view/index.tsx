@@ -6,6 +6,7 @@ import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { useTweaks } from "../../lib/tweaksStore";
 import { fmt } from "../../lib/fmt";
+import { Toggle } from "../settings_view/Toggle";
 import "./Replay.css";
 
 function modelBadgeKind(model: string | null): "opus" | "sonnet" | "haiku" | "neutral" {
@@ -22,6 +23,7 @@ export function SessionReplay() {
   const betterMode = useTweaks((s) => s.tweaks.better_prompt_mode);
   const [query, setQuery] = useState("");
   const [onlyWaste, setOnlyWaste] = useState(false);
+  const [includePaused, setIncludePaused] = useState(false);
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [activeIdx, setActiveIdx] = useState<number>(0);
 
@@ -30,8 +32,8 @@ export function SessionReplay() {
     queryFn: () => api.listSessions({ q: query || undefined, has_waste: onlyWaste, limit: 50 }),
   });
   const replayQuery = useQuery({
-    queryKey: ["sessions", activeSession, "replay"],
-    queryFn: () => (activeSession ? api.sessionReplay(activeSession) : Promise.resolve(null)),
+    queryKey: ["sessions", activeSession, "replay", includePaused],
+    queryFn: () => (activeSession ? api.sessionReplay(activeSession, includePaused) : Promise.resolve(null)),
     enabled: !!activeSession,
   });
 
@@ -63,9 +65,22 @@ export function SessionReplay() {
               : "세션을 선택하세요"}
           </p>
         </div>
-        <Button variant="ghost" size="sm" disabled title="Playback · v1.1">
-          <Play size={12} strokeWidth={1.8} /> Playback
-        </Button>
+        <div className="hstack" style={{ gap: 12 }}>
+          <label style={{ fontSize: 12, color: "var(--fg-2)", display: "flex", alignItems: "center", gap: 8 }}>
+            Include paused
+            <Toggle
+              on={includePaused}
+              onChange={(next) => {
+                setIncludePaused(next);
+                setActiveIdx(0);
+              }}
+              ariaLabel="Include paused transcript messages"
+            />
+          </label>
+          <Button variant="ghost" size="sm" disabled title="Playback · v1.1">
+            <Play size={12} strokeWidth={1.8} /> Playback
+          </Button>
+        </div>
       </div>
 
       <div className="replay-wrap">

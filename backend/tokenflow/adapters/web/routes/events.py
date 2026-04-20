@@ -37,6 +37,30 @@ def _as_ticker(payload: dict[str, object]) -> dict[str, object] | None:
         label = f"{role} · {model}".strip(" ·")
         return {"id": now_id, "t": "reply", "label": label or role, "tk": tokens, "time": now_hhmmss}
 
+    if payload.get("kind") == "waste-detected":
+        severity = str(payload.get("severity") or "waste")
+        waste_kind = str(payload.get("waste_kind") or "waste")
+        return {"id": now_id, "t": "waste", "label": f"{severity} {waste_kind}", "tk": 0, "time": now_hhmmss}
+
+    if payload.get("kind") == "budget-threshold":
+        threshold = payload.get("threshold_pct") or "budget"
+        spent = payload.get("spent")
+        budget = payload.get("budget")
+        return {"id": now_id, "t": "budget", "label": f"Budget {threshold}% reached · ${spent} / ${budget}", "tk": 0, "time": now_hhmmss}
+
+    if payload.get("kind") == "context-saturation":
+        pct = int(float(payload.get("pct") or 0) * 100)
+        return {"id": now_id, "t": "context", "label": f"Context saturation {pct}%", "tk": 0, "time": now_hhmmss}
+
+    if payload.get("kind") == "opus-overuse":
+        pct = int(float(payload.get("share") or 0) * 100)
+        return {"id": now_id, "t": "opus", "label": f"Opus usage {pct}% of spend", "tk": 0, "time": now_hhmmss}
+
+    if payload.get("kind") == "api-error":
+        source = str(payload.get("source") or "API")
+        status = str(payload.get("status") or "error")
+        return {"id": now_id, "t": "api_error", "label": f"{source} {status}", "tk": 0, "time": now_hhmmss}
+
     hook_event = payload.get("hook_event_name")
     if not isinstance(hook_event, str):
         return None

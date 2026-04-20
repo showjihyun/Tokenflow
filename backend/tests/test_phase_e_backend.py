@@ -221,13 +221,34 @@ def test_sessions_replay_and_list() -> None:
                 cache_creation_tokens=0, cache_read_tokens=0, cost_usd=0.001 * i,
                 content_preview=f"message {i}",
             )
+        repo.insert_message(
+            message_id="paused-m", session_id="s1",
+            ts=now - timedelta(minutes=10),
+            role="assistant",
+            model="claude-sonnet-4-6",
+            input_tokens=999, output_tokens=999,
+            cache_creation_tokens=0, cache_read_tokens=0, cost_usd=9.99,
+            content_preview="paused message",
+            paused=True,
+        )
         sessions = c.get("/api/sessions").json()
         assert len(sessions) == 1
         assert sessions[0]["messages"] == 3
+        assert sessions[0]["tokens"] == sum((100 * i) + (200 * i) for i in range(3))
 
         replay = c.get("/api/sessions/s1/replay").json()
         assert len(replay["events"]) == 3
         assert replay["summary"]["messages"] == 3
+        assert all(e["id"] != "paused-m" for e in replay["events"])
+
+        replay_with_paused = c.get("/api/sessions/s1/replay?include_paused=true").json()
+        assert len(replay_with_paused["events"]) == 4
+        assert any(e["id"] == "paused-m" for e in replay_with_paused["events"])
+
+        exported = c.get("/api/sessions/s1/export").json()
+        assert len(exported["events"]) == 3
+        exported_with_paused = c.get("/api/sessions/s1/export?include_paused=true").json()
+        assert len(exported_with_paused["events"]) == 4
 
 
 def test_routing_rules_crud() -> None:
@@ -260,7 +281,8 @@ def test_routing_rules_crud() -> None:
 def test_notifications_default_and_patch() -> None:
     with TestClient(create_app()) as c:
         prefs = c.get("/api/settings/notifications").json()
-        assert len(prefs) == 6
+        assert len(prefs) == 8
+        assert {p["key"] for p in prefs} >= {"api_error", "budget_threshold"}
         waste_high = next(p for p in prefs if p["key"] == "waste_high")
         assert waste_high["enabled"] is True
 

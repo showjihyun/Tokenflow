@@ -15,9 +15,7 @@ async def kpi_summary(
     window: Literal["today", "7d", "30d"] = "today",
     repo: Repository = Depends(get_repo),
 ) -> dict[str, Any]:
-    data = repo.kpi_summary()
-    data["window"] = window
-    return data
+    return repo.kpi_summary(window)
 
 
 @router.get("/kpi/models")

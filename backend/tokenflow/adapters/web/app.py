@@ -34,9 +34,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     bus = EventBus(buffer_size=100)
     app.state.repo = repo
     app.state.bus = bus
+    app.state.ingestion_paused = False
 
-    transcript_tailer = TranscriptTailer(repo, publish=bus.publish)
-    event_tailer = EventTailer(repo, publish=bus.publish)
+    repo.apply_retention(days=180)
+
+    transcript_tailer = TranscriptTailer(repo, publish=bus.publish, is_paused=lambda: bool(app.state.ingestion_paused))
+    event_tailer = EventTailer(repo, publish=bus.publish, is_paused=lambda: bool(app.state.ingestion_paused))
     app.state.transcript_tailer = transcript_tailer
     app.state.event_tailer = event_tailer
 
@@ -66,18 +69,6 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["*", "Last-Event-ID"],
     )
-
-    @app.get("/api/system/health")
-    async def health() -> dict[str, object]:
-        ndjson = paths.events_ndjson_path()
-        return {
-            "status": "ok",
-            "version": __version__,
-            "db": "ok" if paths.db_path().exists() else "missing",
-            "hook": "active" if ndjson.exists() and ndjson.stat().st_size > 0 else "not-connected",
-            "api_key": "configured" if paths.secret_path().exists() else "not-configured",
-            "home": str(paths.tokenflow_dir()),
-        }
 
     app.include_router(api_router)
 

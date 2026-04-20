@@ -6,9 +6,10 @@ from tokenflow.adapters.web.app import create_app
 
 
 def test_health_returns_ok() -> None:
-    client = TestClient(create_app())
-    r = client.get("/api/system/health")
-    assert r.status_code == 200
-    body = r.json()
-    assert body["status"] == "ok"
-    assert "version" in body
+    # Must use the context-manager form so lifespan runs and app.state is populated.
+    with TestClient(create_app()) as c:
+        r = c.get("/api/system/health")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "ok"
+        assert "version" in body

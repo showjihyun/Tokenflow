@@ -1,27 +1,36 @@
+import { memo, useMemo } from "react";
+
 interface HeatmapProps {
   grid: number[][];
   color?: string;
 }
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+
+const outerStyle = { fontFamily: "var(--font-mono)" } as const;
+const gridStyle = {
+  display: "grid",
+  gridTemplateColumns: "32px repeat(24, 1fr)",
+  gap: 2,
+  fontSize: 9,
+  color: "var(--fg-3)",
+} as const;
+const hourLabelStyle = { textAlign: "center" } as const;
+const dayLabelStyle = { textAlign: "right", paddingRight: 4, alignSelf: "center" } as const;
+const cellBase = {
+  aspectRatio: "1",
+  borderRadius: 2,
+  border: "1px solid var(--border-subtle)",
+} as const;
 
 export function Heatmap({ grid, color = "var(--amber)" }: HeatmapProps) {
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-
   return (
-    <div style={{ fontFamily: "var(--font-mono)" }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "32px repeat(24, 1fr)",
-          gap: 2,
-          fontSize: 9,
-          color: "var(--fg-3)",
-        }}
-      >
+    <div style={outerStyle}>
+      <div style={gridStyle}>
         <div />
-        {hours.map((h) => (
-          <div key={h} style={{ textAlign: "center" }}>
+        {HOURS.map((h) => (
+          <div key={h} style={hourLabelStyle}>
             {h % 3 === 0 ? h : ""}
           </div>
         ))}
@@ -33,28 +42,32 @@ export function Heatmap({ grid, color = "var(--amber)" }: HeatmapProps) {
   );
 }
 
-function Row({ day, data, color }: { day: string; data: number[]; color: string }) {
+const Row = memo(function Row({ day, data, color }: { day: string; data: number[]; color: string }) {
+  // Pre-compute cell styles once per (data, color) tuple so every re-render doesn't
+  // allocate 24 new style objects or run the color-mix string interpolation.
+  const cells = useMemo(
+    () =>
+      HOURS.map((h) => {
+        const v = data[h] ?? 0;
+        const bg =
+          v > 0.05
+            ? `color-mix(in oklch, ${color} ${Math.round(v * 100)}%, var(--bg-2))`
+            : "var(--bg-2)";
+        return {
+          h,
+          title: `${day} ${h}:00 · ${Math.round(v * 100)}%`,
+          style: { ...cellBase, background: bg },
+        };
+      }),
+    [data, color, day],
+  );
+
   return (
     <>
-      <div style={{ textAlign: "right", paddingRight: 4, alignSelf: "center" }}>{day}</div>
-      {Array.from({ length: 24 }, (_, h) => {
-        const v = data[h] ?? 0;
-        return (
-          <div
-            key={h}
-            title={`${day} ${h}:00 · ${Math.round(v * 100)}%`}
-            style={{
-              aspectRatio: "1",
-              borderRadius: 2,
-              background:
-                v > 0.05
-                  ? `color-mix(in oklch, ${color} ${Math.round(v * 100)}%, var(--bg-2))`
-                  : "var(--bg-2)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          />
-        );
-      })}
+      <div style={dayLabelStyle}>{day}</div>
+      {cells.map((c) => (
+        <div key={c.h} title={c.title} style={c.style as React.CSSProperties} />
+      ))}
     </>
   );
-}
+});

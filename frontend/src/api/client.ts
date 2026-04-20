@@ -13,7 +13,19 @@ export interface HealthResponse {
   version: string;
   db: string;
   hook: string;
+  hook_detail?: {
+    status: string;
+    last_event_at: string | null;
+    age_seconds: number | null;
+  };
   api_key: string;
+  api_key_detail?: {
+    configured: boolean;
+    valid: boolean;
+    backend: "keyring" | "file";
+    error?: string;
+  };
+  ingestion_paused?: boolean;
   home?: string;
 }
 
@@ -50,6 +62,8 @@ export interface CostBreakdown {
   parts: CostPart[];
 }
 
+export type LLMModel = "claude-sonnet-4-6" | "claude-opus-4-7";
+
 export interface SettingsResponse {
   budget: {
     monthly_budget_usd: number;
@@ -64,6 +78,11 @@ export interface SettingsResponse {
     alert_level: string;
     lang: string;
     better_prompt_mode: string;
+    llm_model: LLMModel;
+  };
+  llm: {
+    model: LLMModel;
+    supported: LLMModel[];
   };
 }
 
@@ -77,6 +96,7 @@ export interface OnboardingStatus {
     settings_exists: boolean;
   };
   api_key_configured: boolean;
+  api_key?: { configured: boolean; valid: boolean; backend: "keyring" | "file"; error?: string };
   ccprophet: { candidate_path: string; exists: boolean };
 }
 
@@ -176,6 +196,12 @@ export interface NotificationPref {
 
 const BASE = "/api";
 
+function analyticsParams(range: Range, project?: string) {
+  const params = new URLSearchParams({ range });
+  if (project) params.set("project", project);
+  return params;
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...init?.headers },
@@ -207,11 +233,19 @@ export const api = {
     apiFetch<ProjectTrend>(`/projects/${encodeURIComponent(name)}/trend?range=${range}`),
 
   // Analytics
-  analyticsKpi: (range: Range = "7d") => apiFetch<AnalyticsKPI>(`/analytics/kpi?range=${range}`),
-  analyticsDaily: (range: Range = "30d") => apiFetch<DailyResponse>(`/analytics/daily?range=${range}`),
-  analyticsHeatmap: (range: Range = "7d") => apiFetch<HeatmapResponse>(`/analytics/heatmap?range=${range}`),
-  analyticsCostBreakdown: (range: Range = "30d") =>
-    apiFetch<CostBreakdown>(`/analytics/cost-breakdown?range=${range}`),
+  analyticsKpi: (range: Range = "7d", project?: string) =>
+    apiFetch<AnalyticsKPI>(`/analytics/kpi?${analyticsParams(range, project)}`),
+  analyticsDaily: (range: Range = "30d", project?: string) =>
+    apiFetch<DailyResponse>(`/analytics/daily?${analyticsParams(range, project)}`),
+  analyticsHeatmap: (range: Range = "7d", project?: string) =>
+    apiFetch<HeatmapResponse>(`/analytics/heatmap?${analyticsParams(range, project)}`),
+  analyticsCostBreakdown: (range: Range = "30d", project?: string) =>
+    apiFetch<CostBreakdown>(`/analytics/cost-breakdown?${analyticsParams(range, project)}`),
+  analyticsTopWastes: (range: Range = "30d", limit = 4, project?: string) => {
+    const params = analyticsParams(range, project);
+    params.set("limit", String(limit));
+    return apiFetch<WastePattern[]>(`/analytics/top-wastes?${params.toString()}`);
+  },
 
   // Settings
   getSettings: () => apiFetch<SettingsResponse>("/settings"),
@@ -220,14 +254,49 @@ export const api = {
   patchTweaks: (body: Partial<SettingsResponse["tweaks"]>) =>
     apiFetch<SettingsResponse>("/settings/tweaks", { method: "PATCH", body: JSON.stringify(body) }),
   apiKeyStatus: () =>
-    apiFetch<{ configured: boolean; valid: boolean; error?: string }>("/settings/api-key/status"),
+    apiFetch<{ configured: boolean; valid: boolean; backend: "keyring" | "file"; error?: string }>(
+      "/settings/api-key/status",
+    ),
   setApiKey: (key: string) =>
-    apiFetch<{ configured: boolean }>("/settings/api-key", {
+    apiFetch<{ configured: boolean; backend: "keyring" | "file" }>("/settings/api-key", {
       method: "POST",
       body: JSON.stringify({ key }),
     }),
   deleteApiKey: () =>
     apiFetch<{ configured: boolean }>("/settings/api-key", { method: "DELETE" }),
+  pauseIngestion: (paused: boolean) =>
+    apiFetch<{ paused: boolean }>("/system/ingestion-pause", {
+      method: "POST",
+      body: JSON.stringify({ paused }),
+    }),
+  listBackups: () =>
+    apiFetch<{ name: string; path: string; bytes: number; mtime: string }[]>("/system/backups"),
+  vacuum: () =>
+    apiFetch<{
+      ok: boolean;
+      before_bytes: number;
+      after_bytes: number;
+      backup: { name: string; path: string; bytes: number } | null;
+      retention: { rolled_messages: number; retention_days: number };
+    }>("/system/vacuum", { method: "POST" }),
+  importCcprophet: (path: string) =>
+    apiFetch<{ job_id: string; state: string }>("/import/ccprophet", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    }),
+  importCcprophetStatus: (jobId: string) =>
+    apiFetch<{
+      job_id: string;
+      state: "queued" | "running" | "done" | "failed";
+      path: string;
+      imported: number;
+      skipped: number;
+      errors: string[];
+      total: number;
+      counts: Record<string, number>;
+      created_at: string;
+      updated_at: string;
+    }>(`/import/ccprophet/status/${encodeURIComponent(jobId)}`),
 
   // Onboarding
   onboardingStatus: () => apiFetch<OnboardingStatus>("/onboarding/status"),
@@ -245,7 +314,11 @@ export const api = {
   dismissWaste: (id: string) =>
     apiFetch<{ ok: boolean }>(`/wastes/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
   applyWaste: (id: string) =>
-    apiFetch<{ ok: boolean; outcome: string }>(`/wastes/${encodeURIComponent(id)}/apply`, { method: "POST" }),
+    apiFetch<{
+      ok: boolean;
+      outcome: string;
+      preview: { path: string; title: string; diff: string } | null;
+    }>(`/wastes/${encodeURIComponent(id)}/apply`, { method: "POST" }),
   scanWastes: (sessionId?: string) =>
     apiFetch<{ new: string[] }>(`/wastes/scan${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`, {
       method: "POST",
@@ -264,6 +337,11 @@ export const api = {
       { method: "POST", body: JSON.stringify({ content }) },
     ),
   coachSuggestions: () => apiFetch<string[]>("/coach/suggestions"),
+  queryQuality: (query: string, context: Record<string, unknown> = {}) =>
+    apiFetch<{ grade: "A" | "B" | "C" | "D"; score: number; signals: Record<string, number> }>(
+      "/coach/query-quality",
+      { method: "POST", body: JSON.stringify({ query, context }) },
+    ),
 
   // Session replay
   listSessions: (opts: { project?: string; has_waste?: boolean; q?: string; limit?: number } = {}) => {
@@ -275,8 +353,14 @@ export const api = {
     const qs = params.toString();
     return apiFetch<SessionSummary[]>(`/sessions${qs ? `?${qs}` : ""}`);
   },
-  sessionReplay: (sessionId: string) =>
-    apiFetch<ReplayResponse>(`/sessions/${encodeURIComponent(sessionId)}/replay`),
+  sessionReplay: (sessionId: string, includePaused = false) =>
+    apiFetch<ReplayResponse>(
+      `/sessions/${encodeURIComponent(sessionId)}/replay${includePaused ? "?include_paused=true" : ""}`,
+    ),
+  exportSession: (sessionId: string, includePaused = false) =>
+    apiFetch<{ schema: string; session_id: string; summary: ReplayResponse["summary"]; events: ReplayEvent[] }>(
+      `/sessions/${encodeURIComponent(sessionId)}/export${includePaused ? "?include_paused=true" : ""}`,
+    ),
   betterPrompt: (sessionId: string, idx: number, mode: "static" | "llm", wasteReason?: string) => {
     const params = new URLSearchParams({ mode });
     if (wasteReason) params.set("waste_reason", wasteReason);

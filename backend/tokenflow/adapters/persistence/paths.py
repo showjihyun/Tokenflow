@@ -39,8 +39,55 @@ def ensure_dirs() -> None:
         p.mkdir(parents=True, exist_ok=True)
 
 
+# ---- package / dev-checkout layout helpers ----
+# paths.py location: <prefix>/tokenflow/adapters/persistence/paths.py
+#   parents[0] persistence/
+#   parents[1] adapters/
+#   parents[2] tokenflow/        <- the Python package root
+#   parents[3] <prefix>          <- `backend/` in dev, `site-packages/` in wheel install
+#   parents[4] <prefix>/..       <- repo root in dev (has `frontend/`), or env root in wheel
+
+def _package_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _dev_backend_root_or_none() -> Path | None:
+    """Backend dir in a dev checkout (contains `migrations/`). None when installed from wheel."""
+    candidate = Path(__file__).resolve().parents[3]
+    if (candidate / "migrations").is_dir():
+        return candidate
+    return None
+
+
+def _dev_repo_root_or_none() -> Path | None:
+    """Repo root in a dev checkout (contains `frontend/`)."""
+    candidate = Path(__file__).resolve().parents[4]
+    if (candidate / "frontend").is_dir():
+        return candidate
+    return None
+
+
 def migrations_dir() -> Path:
-    """Package-bundled migrations directory."""
-    here = Path(__file__).resolve()
-    backend_root = here.parents[3]
-    return backend_root / "migrations"
+    """Wheel: tokenflow/_migrations. Dev: backend/migrations."""
+    packaged = _package_root() / "_migrations"
+    if packaged.is_dir():
+        return packaged
+    dev = _dev_backend_root_or_none()
+    if dev is not None:
+        return dev / "migrations"
+    raise FileNotFoundError(
+        "no migrations directory — wheel missing _migrations or not in a dev checkout"
+    )
+
+
+def frontend_dist_dir() -> Path | None:
+    """Wheel: tokenflow/_static. Dev: <repo>/frontend/dist. None if neither built."""
+    packaged = _package_root() / "_static"
+    if packaged.is_dir() and (packaged / "index.html").exists():
+        return packaged
+    repo = _dev_repo_root_or_none()
+    if repo is not None:
+        dev = repo / "frontend" / "dist"
+        if dev.is_dir() and (dev / "index.html").exists():
+            return dev
+    return None

@@ -1,20 +1,19 @@
 # Token Flow — SPEC
 
-> 버전 0.3 · 2026-04-20 · 독립 리뷰 gap 20개 반영. DESIGN.md 진행 준비 완료.
+> 버전 0.3-impl · 2026-04-20 · 현재 구현 기준으로 정리. 코드보다 SPEC이 더 타당한 항목은 §12에 별도 추적.
 
-### v0.2 → v0.3 변경 요약
+### v0.3 구현 정합성 요약
 - KPI 포뮬러 정의: **Efficiency Score**, **Query Quality Score**, **Opus overuse 임계값**
 - Waste 패턴 구체적 임계값 확정 (window, similarity, LOC 기준)
-- **§4.4 신규** — 최초 실행 onboarding (hook 자동 설치, API 키, import 유도)
+- **§4.4** — 현재 onboarding 구현 기준 반영 (hook 자동 설치, API 키, ccprophet 후보 감지)
 - **§6.x 신규** — 뷰별 empty/first-run state
 - **§6.5** — 과거 세션 picker UI 추가
 - Better prompt LLM 모드 프롬프트 템플릿 정의
-- Waste detection 스케줄링 정의 (SessionEnd + hourly sweep)
+- Waste detection 스캔/스윕 API 구현 기준 반영
 - **§10** — 에러 taxonomy 추가, 스케일 가정 명시
 - **§11** — 데이터 retention/pricing 업데이트 정책
-- SSE 재연결 / backpressure 정책
-- Pause tracking + Export session 동작 정의
-- Import 중복/실패/진행률 semantics
+- SSE ticker 재연결 / backpressure 정책
+- Pause tracking, Export session, Import REST API, Query Quality API 등 SPEC 우선 항목의 구현 상태는 §12에 추적
 
 ---
 
@@ -53,14 +52,14 @@
 
 | | In scope (v1) | Non-goals (v1) |
 |---|---|---|
-| 플랫폼 | 웹 대시보드 (브라우저) | 데스크톱 앱, 모바일, CLI 독립 실행 |
+| 플랫폼 | 웹 대시보드 (브라우저) + 로컬 CLI harness | 데스크톱 앱, 모바일 |
 | 사용자 | 개인 개발자 1명 | 팀·조직, SSO, RBAC |
 | 인증 | 로컬 전용 127.0.0.1 | 원격 배포, OAuth |
 | 데이터 원천 | Claude Code 훅 + JSONL transcript | IDE 플러그인, 프록시 |
 | 예산 하드 차단 | 알림만 | 요청 차단 (v2) |
 | AI Coach | Sonnet 4.6 대화 | 멀티 에이전트, 자동 코드 수정 |
 | Better prompt | 정적 + LLM, 사용자 선택 | 자동 적용 (수동 복사만) |
-| 과거 데이터 | ccprophet import | 타 도구 import |
+| 과거 데이터 | ccprophet import CLI + REST job | 타 도구 import |
 | 국제화 | 한국어/영어 | 기타 언어 |
 
 ---
@@ -89,7 +88,7 @@ Token Flow = ccprophet 코어 흡수 + 새 UI.
 5. **Better prompt 제안기** (static + LLM)
 6. **Activity ticker SSE 스트리밍**
 7. **사용자 설정 저장소** (budget/routing/notif/tweaks/api_key)
-8. **ccprophet DB import CLI + API**
+8. **ccprophet DB import CLI + REST job API**
 9. **Onboarding flow** (hook 자동 설치)
 
 ---
@@ -143,7 +142,7 @@ Token Flow = ccprophet 코어 흡수 + 새 UI.
 │  │  domain/  (entities, values, services)            │    │
 │  └───────────────────────────────────────────────────┘    │
 │  Storage: ~/.tokenflow/events.duckdb                       │
-│           ~/.tokenflow/secret.json  (API key, 0600)        │
+│           OS keyring or ~/.tokenflow/secret.json fallback  │
 │           ~/.tokenflow/events.ndjson (hook append log)     │
 │           ~/.tokenflow/logs/                                │
 └───────────────────────────────────────────────────────────┘
@@ -174,7 +173,7 @@ tokenflow/
 │   │   │   ├── coach/
 │   │   │   └── web/
 │   │   └── harness/
-│   ├── migrations/     # V1–V8 SQL
+│   ├── migrations/     # V1–V10 SQL
 │   ├── tests/
 │   └── pyproject.toml
 ├── frontend/
@@ -205,15 +204,15 @@ Claude Code 훅 payload 에 **토큰 카운트 없음** (공식 문서 확인). 
 
 ### 4.4 최초 실행 onboarding (신규)
 
-`tokenflow serve` 를 처음 실행했을 때의 5단계 플로우. 각 단계는 React Onboarding 뷰에서 진행 상황을 표시 (사이드바 뷰 비활성, 중앙 스테퍼만 노출).
+`tokenflow serve` 를 처음 실행했을 때 React Onboarding 뷰가 현재 상태를 표시한다. 구현은 hook 설치, API 키 입력, ccprophet 후보 감지, 완료 처리를 제공한다.
 
 **Step 1 — Hook 설치 상태 감지**
 - Claude Code 설정 파일 경로 자동 탐색 (macOS/Linux: `~/.claude/settings.json`, Windows: `%USERPROFILE%\.claude\settings.json`). XDG 존중.
 - 파일 내 `hooks.SessionStart` 이하에 `tokenflow-hook` 존재 여부 체크
-- **상태 3가지**: `not_found` / `mismatched` (다른 버전) / `ok`
+- **현재 상태값**: `not_installed` / `partial` / `installed` / `unknown`
 
 **Step 2 — Hook 자동 설치 제안**
-- `not_found` 또는 `mismatched` 이면 "Install hook into Claude Code?" 모달
+- `not_installed` 또는 `partial` 이면 "Install hook into Claude Code?" 액션 표시
 - `Allow` → `settings.json` 에 다음 hook 블록 append (기존 설정 보존, `.bak` 백업)
   ```json
   {
@@ -230,19 +229,17 @@ Claude Code 훅 payload 에 **토큰 카운트 없음** (공식 문서 확인). 
 **Step 3 — Claude API 키 입력 (선택)**
 - Coach / LLM better prompt 기능은 API 키 필요
 - `Add later` 로 건너뛰면 해당 뷰는 read-only 배너 표시
-- 입력 시 `~/.tokenflow/secret.json` 에 0600 권한으로 저장, 즉시 ping test (`messages.count_tokens` 한 번)
+- 입력 시 OS keyring 을 우선 사용하고, keyring backend 가 없으면 `~/.tokenflow/secret.json` 에 0600 권한으로 저장한다. 현재 구현은 저장 여부만 확인하며 즉시 API ping test 는 하지 않는다.
 
-**Step 4 — ccprophet DB import 유도 (감지 시)**
+**Step 4 — ccprophet DB 후보 감지**
 - `~/.claude-prophet/events.duckdb` 가 존재하면 자동 감지
-- "이전 ccprophet 사용 기록 발견. Import?" (세션 수, 기간 표시)
-- `Import` → 백그라운드 job 실행, 진행률 바
-- `Skip` → 빈 상태로 시작
+- 현재 UI/API는 후보 경로와 존재 여부를 표시한다. import 실행은 CLI `tokenflow import --from-ccprophet <path>` 로 수행한다.
 
 **Step 5 — 완료**
 - "Claude Code 를 한 번 시작하면 Live Monitor 가 활성화됩니다" 안내
 - Live Monitor 로 이동
 
-**Hook 연결 상태 pill** (topbar, §7.2): `ok` / `stale` (마지막 이벤트 >10분) / `disconnected` (hook 미설치). 상태별 배지 색: green/amber/red.
+**Hook 연결 상태 pill** (topbar, §7.2): `/system/health` 의 `hook` 값은 마지막 DB event 시각 기준 `ok` / `stale`(>10분) / `disconnected` 로 반환한다.
 
 ---
 
@@ -254,15 +251,14 @@ ccprophet 엔티티 계승 (`TokenCount`, `Money`, `Session`, `Event`, `ToolCall
 
 | Entity | 필드 | 용도 |
 |---|---|---|
-| `UserProfile` | `name`, `email`, `plan`, `avatar_initials` | 사이드바 |
-| `BudgetConfig` | `monthly_limit_usd`, `alert_thresholds:[50,75,90]`, `hard_block:bool(v1 ignored)` | Settings |
+| `Config` (`tf_config`) | `monthly_budget_usd`, `alert_thresholds_pct`, `hard_block`, `better_prompt_mode`, `theme`, `density`, `chart_style`, `sidebar_pos`, `alert_level`, `lang`, `llm_model`, `onboarded_at` | Settings + Onboarding |
 | `RoutingRule` | `id`, `condition_pattern`, `target_model`, `enabled`, `priority` | Model routing |
 | `NotificationPref` | `key`, `enabled`, `channel:in_app|system` | 알림 설정 |
 | `WastePattern` | `id`, `kind`, `severity`, `title`, `meta`, `body_html`, `save_tokens`, `save_usd`, `sessions`, `dismissed_at`, `detected_at` | Waste Radar |
 | `CoachThread` | `id`, `title`, `started_at`, `last_msg_at`, `cost_usd_total` | AI Coach |
 | `CoachMessage` | `id`, `thread_id`, `role:ai|me`, `content`, `time`, `context_snapshot_json`, `cost_usd` | 대화 기록 |
 | `ReplayEvent` | `t`, `query`, `tokens_in`, `tokens_out`, `model`, `cost_usd`, `waste_flag`, `waste_reason` | Replay |
-| `BetterPromptSuggestion` | `source_message_id`, `suggested_text`, `est_save_tokens`, `mode:static|llm`, `cached_at` | Replay detail |
+| `BetterPromptSuggestion` (`tf_better_prompt`) | `session_id`, `msg_index`, `suggested_text`, `est_save_tokens`, `mode:static|llm`, `cached_at` | Replay detail |
 | `TweaksConfig` | `theme`, `density`, `chartStyle`, `sidebarPos`, `alertLevel`, `lang`, `better_prompt_mode` | UI (localStorage + server 싱크) |
 
 ### 5.2 Waste 패턴 탐지 사양
@@ -306,10 +302,10 @@ A ≥ 85, B ≥ 70, C ≥ 55, D < 55
 ### 5.4 데이터 retention & pricing 업데이트
 
 **Retention**:
-- 상세 이벤트 (`events`, `tool_calls`, `messages`): **180일**
-- 일별 집계 (`daily_aggregate`): **무기한** (사용량 작음)
-- 180일 초과 시 자동 rollup + 원본 삭제 (daily cron in serve)
-- `tokenflow doctor --vacuum` 으로 수동 축소
+- 상세 `events`, `tf_messages` 는 180일 보관한다.
+- 180일 이전 `tf_messages` 는 삭제 전 `daily_aggregate` 로 day/project/model 단위 rollup 한다.
+- 자동 retention 은 앱 시작 시 수행하고, `/system/vacuum` 실행 시에도 retention 후 DuckDB vacuum 을 수행한다.
+- `/system/backups` 는 생성된 `.duckdb` 백업 목록을 반환한다.
 
 **Pricing rates**:
 - `PricingRate` 테이블은 마이그레이션 V1 에서 seed (Sonnet 4.5, 4.6, Opus 4, Haiku 4.5 등 출시 가격)
@@ -319,12 +315,14 @@ A ≥ 85, B ≥ 70, C ≥ 55, D < 55
 
 ### 5.5 DB 마이그레이션
 
-- V1–V5: ccprophet 복사 (import 호환)
-- V6: `user_profile`, `budget_config`, `routing_rule`, `notification_pref`, `tweaks_config`
-- V7: `waste_pattern`, `coach_thread`, `coach_message`
-- V8: `better_prompt_suggestion`, `daily_aggregate`, 인덱스
+- V1–V5: ccprophet 호환 기반 테이블
+- V6: `tf_messages`, `tf_transcript_offsets`, `tf_hook_offset`, `tf_config`
+- V7: `tf_waste_patterns`, `tf_coach_threads`, `tf_coach_messages`, `tf_better_prompt`, `tf_routing_rules`, `tf_notification_prefs`
+- V9: `tf_config.llm_model`
+- V10: `tf_messages.paused`, `daily_aggregate`
+- V11: `budget_threshold`, `api_error` notification preferences
 
-마이그레이션은 **forward-only**. 실행 전 `~/.tokenflow/backups/events_YYYYMMDD_HHMMSS.duckdb` 자동 백업. Rollback 은 백업 복원.
+마이그레이션은 현재 **forward-only** 로 적용된다. pending migration 적용 전 DB 파일 백업은 수행한다. 실패 로그/자동 복원은 추가 개선 항목이다.
 
 ---
 
@@ -345,7 +343,7 @@ A ≥ 85, B ≥ 70, C ≥ 55, D < 55
 
 **상호작용**:
 - `Pause tracking`: 서버의 `ingestion_paused` 플래그 토글. hook 은 계속 실행되지만 event 는 `paused=true` 마커로 기록 (삭제 아님, 분석 제외)
-- `Export session`: 현재 세션의 `Session + ReplayEvent[]` JSON 다운로드. schema: `tokenflow.export.v1`
+- `Export session`: 현재 세션의 `Session + ReplayEvent[]` JSON 다운로드. schema: `tokenflow.export.v1`. 기본값은 paused transcript message 제외, `include_paused=true` 로 forensic/debug export 가능
 
 **Empty state (hook 연결 직후, 이벤트 없음)**:
 - KPI 카드 대신 "Waiting for first event from Claude Code…" 스켈레톤
@@ -387,8 +385,8 @@ A ≥ 85, B ≥ 70, C ≥ 55, D < 55
 - `tool-loop`: CLAUDE.md 에러 규칙 추가
 
 **탐지 스케줄링** (§5.2 임계값 기반):
-- **SessionEnd 시점**: 해당 세션 범위에서 5종 패턴 평가 → 매칭 시 `WastePattern` insert
-- **시간당 sweep**: 최근 24시간 내 세션을 크로스 세션 관점으로 재평가 (repeat-question, wrong-model 누적)
+- `/wastes/scan?session_id=`: 특정 세션 또는 최근 24시간 범위에서 5종 패턴 평가 → 매칭 시 `WastePattern` insert
+- `/wastes/sweep`: 시간당 sweep 과 동일한 전체 탐지 동작을 수동 실행. 최근 24시간 내 세션을 크로스 세션 관점으로 재평가
 - 매칭 결과는 SSE `waste-detected` 이벤트로 푸시 → Bell 알림 + Waste Radar 자동 갱신
 
 **Empty state**: "No waste patterns detected. 🎉" + "Explore optimization tips" 링크
@@ -415,7 +413,7 @@ A ≥ 85, B ≥ 70, C ≥ 55, D < 55
 
 **세션 picker**:
 - 뷰 진입 시 좌측 slim sidebar 에 세션 리스트 (기본 최근 20개, 무한 스크롤)
-- 각 항목: 시작 시각, 프로젝트, 총 토큰, 총 비용, waste 아이콘
+- 각 항목: 시작 시각, 프로젝트, 총 토큰, 총 비용, waste 아이콘. paused transcript message 는 totals/messages/cost/search 에서 제외
 - 클릭 시 해당 세션 replay. 기본 landing = 가장 최근 세션
 - 상단 필터: 프로젝트, 기간, "has waste only"
 - 검색창: 쿼리 텍스트로 세션 검색
@@ -425,6 +423,11 @@ A ≥ 85, B ≥ 70, C ≥ 55, D < 55
 2. 스크럽 바 차트
 3. 메시지 테이블
 4. Detail 패널 + Better prompt
+
+**Paused transcript 처리**:
+- `session_replay` 기본 응답은 paused transcript message 를 제외한다.
+- 원본 디버깅/감사용 조회는 `include_paused=true` 로 요청한다.
+- `export_session` 도 동일하게 기본 제외, `include_paused=true` 포함 정책을 따른다.
 
 **Better prompt — 2모드**:
 
@@ -471,10 +474,10 @@ Output: a rewritten query only (no explanation).
 2. **Model routing rules** — 조건→모델 매핑, 토글, Add rule
 3. **Notifications** — 6종 토글
    - In-app: 항상 가능
-   - **System notifications**: OS 권한 요청 플로우. 미권한 시 "Grant permission" 버튼. 미지원 OS 는 해당 토글 비활성
-4. **Better prompt mode** — radio: static / llm. 서버 `tweaks_config` 에 영속. **Tweaks 패널의 동일 설정과 서버 값이 diff 날 때 서버를 source of truth** 로 간주 (localStorage overwrite)
-5. **Claude API key** — 입력·편집·삭제·연결 테스트. 미입력 시 Coach/LLM 기능 비활성
-6. **Data** (신규) — "Vacuum now" 버튼, 최근 백업 리스트, "Import from ccprophet" 버튼
+   - System: 브라우저 Notification API 지원/권한 상태에 따라 토글 가능 여부를 제어
+4. **Better prompt mode** — static / llm. 서버 `tf_config.better_prompt_mode` 에 영속하며 API 경로는 `/settings/tweaks`
+5. **Claude API key** — 입력·편집·삭제. 미입력 시 Coach/LLM 기능 비활성. 연결 테스트는 §12 추적 항목
+6. **Data** — Vacuum, 백업 리스트, ccprophet import job 상태를 Settings UI 에서 연결
 
 **i18n 범위**:
 - UI 고정 문자열: 번역됨 (`i18n/ko.json`, `i18n/en.json`)
@@ -482,7 +485,7 @@ Output: a rewritten query only (no explanation).
 
 ### 6.7 Onboarding (신규)
 
-§4.4 플로우. 완료 후 `user_profile.onboarded_at` 기록. 재진입 가능: Settings → "Re-run onboarding".
+§4.4 플로우. 완료 후 `tf_config.onboarded_at` 기록. Settings 에서 재진입하는 "Re-run onboarding" 액션은 §12 추적 항목.
 
 ---
 
@@ -515,21 +518,24 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/sessions/current` | 현재 활성 세션 |
-| GET | `/sessions/{sid}` | 세션 상세 |
-| GET | `/sessions/{sid}/replay` | Replay 이벤트 |
-| GET | `/sessions?from=&to=&project=&has_waste=&q=` | 세션 검색·필터 |
-| GET | `/events/stream` | SSE (Last-Event-ID 지원) |
-| GET | `/sessions/current/flow?window=60m` | SSE flow chart |
+| GET | `/sessions/{sid}/replay?include_paused=false` | Replay 이벤트. 기본 paused message 제외 |
+| GET | `/sessions/{sid}/export?include_paused=false` | `tokenflow.export.v1` JSON export. 기본 paused message 제외 |
+| GET | `/sessions?project=&has_waste=&q=&limit=` | 세션 검색·필터. totals/messages/cost/search 는 paused message 제외 |
+| GET | `/events/stream` | Activity ticker SSE (`Last-Event-ID` 지원) |
+| GET | `/sessions/current/flow?window=60m` | 60분 flow chart JSON snapshot |
+| GET | `/sessions/current/flow/stream?window=60m` | Flow chart SSE snapshot/invalidation (`event: flow`) |
 
 ### 8.2 KPI / 분석
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/kpi/summary?window=today\|7d\|30d` | |
-| GET | `/kpi/efficiency-score?scope=session\|day&id=` | Score + 세부 패널티 |
-| GET | `/analytics/daily?range=30d&project=` | stacked area |
-| GET | `/analytics/heatmap?range=7d&project=` | 히트맵 |
-| GET | `/analytics/cost-breakdown?range=30d&project=` | 비용 분해 |
-| GET | `/analytics/top-wastes?range=30d&limit=4` | top patterns |
+| GET | `/kpi/models` | 모델별 오늘 token/cost/share |
+| GET | `/kpi/budget` | 월 예산, 사용액, forecast, Opus share |
+| GET | `/analytics/kpi?range=7d` | 분석 KPI summary |
+| GET | `/analytics/daily?range=30d` | stacked area |
+| GET | `/analytics/heatmap?range=7d` | 히트맵 |
+| GET | `/analytics/cost-breakdown?range=30d` | 비용 분해 |
+| GET | `/analytics/top-wastes?range=30d&limit=4` | `tf_waste_patterns` 기반 top patterns. range 내 kind별 aggregate 후 severity → save_usd → save_tokens → detected_at 순 정렬 |
 
 ### 8.3 Waste
 | Method | Path | 설명 |
@@ -537,6 +543,8 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | GET | `/wastes?status=active\|dismissed` | |
 | POST | `/wastes/{id}/dismiss` | |
 | POST | `/wastes/{id}/apply` | |
+| POST | `/wastes/scan?session_id=` | 특정 세션 또는 현재 범위 waste 탐지 |
+| POST | `/wastes/sweep` | hourly sweep 과 동일한 전체 탐지 |
 
 ### 8.4 Coach
 | Method | Path | 설명 |
@@ -551,22 +559,23 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 ### 8.5 Settings
 | Method | Path | 설명 |
 |---|---|---|
-| GET/PUT | `/settings/budget` | |
+| GET | `/settings` | `{ budget, tweaks }` |
+| PUT | `/settings/budget` | budget 갱신 후 `{ budget, tweaks }` 반환 |
 | GET | `/settings/routing-rules` | |
-| POST/PATCH/DELETE | `/settings/routing-rules/{id}` | |
-| GET/PATCH | `/settings/notifications` | |
-| GET/PATCH | `/settings/better-prompt` | `{mode:static\|llm}` |
+| POST | `/settings/routing-rules` | routing rule 생성 |
+| PATCH/DELETE | `/settings/routing-rules/{id}` | |
+| GET | `/settings/notifications` | |
+| PATCH | `/settings/notifications/{pref_key}` | |
 | POST | `/settings/api-key` | |
-| GET | `/settings/api-key/status` | `{configured}` |
+| GET | `/settings/api-key/status` | `{configured, valid, backend}` |
 | DELETE | `/settings/api-key` | |
-| GET/PUT | `/settings/tweaks` | `TweaksConfig` server copy |
+| PATCH | `/settings/tweaks` | `TweaksConfig` server copy. `better_prompt_mode` 도 여기서 갱신 |
 
 ### 8.6 Projects
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/projects?range=7d` | |
-| GET | `/projects/{name}` | |
-| GET | `/projects/{name}/trend?range=7d` | 스파크라인 데이터 |
+| GET | `/projects/{name}/trend?range=7d` | 현재는 7점 placeholder 스파크라인 |
 
 ### 8.7 Better prompt
 | Method | Path | 설명 |
@@ -574,25 +583,28 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | POST | `/sessions/{sid}/messages/{idx}/better-prompt?mode=static\|llm` | |
 
 ### 8.8 Import
+
+구현된 경로는 CLI `tokenflow import --from-ccprophet <path>` 와 REST background job API 이다. V1–V5 공유 테이블을 idempotent 하게 복사한다.
+
 | Method | Path | 설명 |
 |---|---|---|
-| POST | `/import/ccprophet` | Body `{ path }` → job id 반환. **중복**: 동일 `session_id` 는 skip. **실패**: 라인 단위 에러 로그, 전체 중단 없음 (partial success). Rollback 은 백업 복원. |
-| GET | `/import/ccprophet/status/{job_id}` | `{ state: running\|done\|failed, imported, skipped, errors, total }` |
+| POST | `/import/ccprophet` | Body `{ path }` → `{ job_id, state }` |
+| GET | `/import/ccprophet/status/{job_id}` | `{ state, imported, skipped, errors, total, counts }` |
 
 ### 8.9 Onboarding
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/onboarding/status` | `{ hook, api_key, import_source_detected, onboarded_at }` |
-| POST | `/onboarding/install-hook` | `settings.json` 수정 |
-| POST | `/onboarding/complete` | `user_profile.onboarded_at` 세팅 |
+| GET | `/onboarding/status` | `{ onboarded, hook, api_key_configured, ccprophet }` |
+| POST | `/onboarding/install-hook?dry_run=` | `settings.json` 수정. 기존 파일은 `.bak.<timestamp>_<suffix>` 로 백업 |
+| POST | `/onboarding/complete` | `tf_config.onboarded_at` 세팅 |
 
 ### 8.10 System
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/system/health` | DB · disk · hook 연결 · API 키 상태 |
-| POST | `/system/vacuum` | 수동 retention 정리 |
-| POST | `/system/ingestion-pause` | `{ paused: bool }` |
-| GET | `/system/backups` | 백업 파일 리스트 |
+| GET | `/system/health` | `status`, `version`, `db`, `hook`, `api_key`, `home` |
+| POST | `/system/ingestion-pause` | Body `{ paused }` → hook event 에 `paused=true` marker |
+| GET | `/system/backups` | 백업 `.duckdb` 파일 리스트 |
+| POST | `/system/vacuum` | vacuum 실행 전 DB backup 생성 후 DuckDB vacuum |
 
 ---
 
@@ -612,15 +624,16 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 3. 신규 라인 파싱 → 토큰 + 메시지 → DuckDB
 
 ### 9.2 폴링 vs SSE
-- SSE: `/events/stream`, `/sessions/current/flow`
+- SSE: `/events/stream` activity ticker
+- SSE: `/sessions/current/flow/stream` flow chart snapshot/invalidation
 - 폴링 5–15초: KPI, 예산, 프로젝트
 - on-demand: Analytics 진입 시 fetch + TanStack Query 캐시
 
 ### 9.3 SSE 재연결 / backpressure
 - 클라이언트 `EventSource` 자동 재연결. `Last-Event-ID` 헤더로 누락분 replay
-- 서버: 이벤트 sequential `event_id` (BIGINT AUTO_INCREMENT). 재연결 시 >id 로 replay
+- 서버: `EventBus` 가 in-memory sequential id 를 부여하고, 재연결 시 buffer 에 남은 >id 이벤트를 replay
 - Ticker buffer: 최근 **100개 ring buffer** 유지, 연결 없으면 drop (무한 쌓이지 않음)
-- Flow chart: 1분 단위 aggregated snapshot 푸시 (raw event 아님)
+- Flow chart: `/sessions/current/flow/stream` 이 최초 snapshot 과 transcript message 기반 invalidation 을 `event: flow` 로 전달한다. REST JSON snapshot 은 fallback/직접 조회용으로 유지한다.
 
 ### 9.4 세션 ↔ transcript 매칭
 - `session_id` primary key, `transcript_path` 매핑 저장
@@ -649,9 +662,9 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 - 모든 DB 로컬 저장
 
 ### 10.3 보안
-- FastAPI `127.0.0.1` 고정 바인딩
-- CORS `http://localhost:*` 만
-- `~/.tokenflow/secret.json` 0600
+- CLI 기본 bind host 는 `127.0.0.1`
+- CORS 허용 origin 은 현재 `http://localhost:5173`, `http://127.0.0.1:5173`
+- API 키는 OS keyring 을 우선 사용한다. keyring backend 가 없으면 `~/.tokenflow/secret.json` fallback 을 사용하고 0600 권한을 best-effort 로 적용한다.
 - `.gitignore` 에 `.tokenflow/` 기본 포함
 
 ### 10.4 에러 taxonomy (UI 노출)
@@ -667,7 +680,7 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | DuckDB 락/오류 | Topbar 에러 배너 "DB unavailable" | 자동 재시도 5초 |
 | Disk 사용 > 90% | Topbar 경고 "Disk almost full", "Vacuum now" CTA | Insert 계속 시도 |
 | Migration 실패 | 서버 기동 중단, 자동 백업 복원 시도, 로그 `~/.tokenflow/logs/migration_failed.log` | 사용자 수동 개입 |
-| API 키 파일 권한 0600 아님 | 경고 후 자동 수정 시도 | 실패 시 기능 비활성 |
+| API 키 파일 권한 0600 아님 | fallback 파일 저장 시 best-effort chmod | 실패 시 keyring 또는 미설정 상태 유지 |
 
 ### 10.5 관측성
 - `~/.tokenflow/logs/` 회전 로그 (7일)
@@ -684,7 +697,7 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 ## 11. 결정된 사항 (v0.2+v0.3)
 
 1. AI Coach LLM → **Claude Sonnet 4.6**
-2. API 키 저장 → 평문 `~/.tokenflow/secret.json` (0600)
+2. API 키 저장 → OS keyring 우선, keyring 미사용 가능 환경에서는 평문 `~/.tokenflow/secret.json` fallback (0600 best-effort)
 3. Coach 컨텍스트 주입 → 토큰·비용·모델·waste·프로젝트명·파일 basename 만
 4. Hard budget limit 차단 → v1 알림만, v2 proxy 차단
 5. Better prompt → **사용자 선택** (static / llm). 기본 static
@@ -692,21 +705,40 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 7. Session Replay Playback → v1 제외
 8. 다중 세션 → 각 `session_id` 분리, Live Monitor 는 최근 활성 1개만
 9. 프로젝트 식별 → `cwd` git root, 아니면 cwd
-10. ccprophet DB import → **v1 포함**, CLI + REST
-11. Waste 탐지 스케줄링 → SessionEnd 즉시 평가 + 시간당 sweep
+10. ccprophet DB import → **v1 포함**, CLI + REST background job/status API 구현
+11. Waste 탐지 → `/wastes/scan`, `/wastes/sweep` API 로 실행. SessionEnd 자동 평가는 추적 항목
 12. Better prompt LLM 템플릿 → §6.5 프롬프트 템플릿 고정
 13. Efficiency Score 포뮬러 → §5.3 정의
 14. Query Quality Score 포뮬러 → §5.3 정의
 15. Opus overuse 임계값 → 월 비용 점유율 15%(권장), 25%(알림 발생)
-16. DB retention → 180일 상세 + daily rollup 무기한
-17. Pricing 업데이트 → 마이그레이션 VN 추가 방식, override 파일 지원
+16. DB retention → 180일 상세 보관 + `daily_aggregate` rollup 구현. 장기 analytics 에 rollup 을 병합하는 것은 추가 개선
+17. Pricing 업데이트 → 현재 seed table 기준. override 파일 지원은 추적 항목
 18. SSE 재연결 → `Last-Event-ID` + 100개 ring buffer
-19. Import 실패 처리 → partial success, 라인 단위 에러 로그
-20. System notifications → OS 권한 플로우 포함
+19. Import 실패 처리 → CLI/REST 모두 공유 테이블 복사 + PK conflict skip 중심. REST job 은 progress/error 상태를 반환
+20. Notifications → in-app/system preference, 브라우저 OS 권한/지원 여부 플로우, waste system notification 1차 구현
 
 ---
 
-## 12. v1 범위 밖 (명시적 제외)
+## 12. 코드보다 SPEC이 더 올바른 구현 추적 항목
+
+현재 문서는 구현 기준으로 API/상태값을 정리했다. 아래는 아직 코드가 더 따라가야 하거나, 1차 구현은 됐지만 추가 개선이 필요한 SPEC 우선 항목이다.
+
+| 항목 | 현재 구현 | SPEC 우선 판단 |
+|---|---|---|
+| API 키 상태 판정 | `/settings/api-key/status`, `/system/health`, `/onboarding/status` 모두 `secret_store.status()` 기반 | 완료. keyring 우선 정책 유지 |
+| Hook stale 판정 | 마지막 DB event 시각 기준 `ok` / `stale`(>10분) / `disconnected` 반환 | 완료. 설치 여부와 연결 상태의 세분화는 추가 개선 가능 |
+| Flow chart 채널 | `/sessions/current/flow/stream` SSE snapshot/invalidation + REST fallback | 완료. `Last-Event-ID` replay 는 EventBus 정책을 따른다 |
+| Import UX | CLI import + REST background job/status API, Settings Data 카드 job 상태 표시 구현 | 완료. 더 자세한 progress bar 는 추가 개선 |
+| 마이그레이션 안전성 | pending migration 적용 전 DB backup 생성 | 1차 완료. 실패 로그/자동 복원은 추가 개선 |
+| Retention/Vacuum | 앱 시작 및 `/system/vacuum` 에서 180일 retention + `daily_aggregate` rollup 수행, `/system/backups` 구현 | 완료. rollup 기반 장기 analytics 활용은 추가 개선 |
+| Top waste analytics | `/analytics/top-wastes` 가 `tf_waste_patterns` 실제 데이터에서 range/limit 기준 kind별 aggregate ranking 반환, Usage Analytics 카드 연결 | 완료. 프로젝트/세션 drill-down 은 추가 개선 |
+| Pause tracking / Export session | pause flag API, paused hook marker, transcript message `paused` marker, 분석/list/replay/export 기본 제외, `include_paused=true` forensic 조회 지원 | 완료. pause 기간 UX 표시는 추가 개선 |
+| Query Quality Score API | `/coach/query-quality` 정적 scoring API 구현 | 완료. UI 노출은 추가 개선 |
+| System notifications | in-app/system preference, 브라우저 Notification 지원/권한 플로우, waste, SessionEnd, budget threshold, context saturation, Opus overuse, API error 이벤트 연결 | 완료. 더 세밀한 알림 빈도 제어는 추가 개선 |
+
+---
+
+## 13. v1 범위 밖 (명시적 제외)
 
 - 팀/조직 대시보드, SSO, RBAC
 - 클라우드 배포·원격 접근
@@ -717,14 +749,14 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 - Data export CSV/Parquet (v1.1)
 - Session Replay Playback (v1.1)
 - Live Monitor 다중 세션 셀렉터 (v1.1)
-- API 키 OS keyring (v1.1)
+- 타 도구 import
 - 임베딩 기반 repeat-question (v1.1, v1 은 TF-IDF)
 - 자동 Coach suggestion — 사용자 지정 질문만 응답 (v1.1)
 - Pre-flight 요청 차단 proxy (v2)
 
 ---
 
-## 13. 용어
+## 14. 용어
 
 - **세션(Session)**: Claude Code 1회 실행 단위
 - **컨텍스트 포화도**: 현재 세션 토큰 / 모델 윈도우
@@ -737,10 +769,9 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 
 ---
 
-## 14. 다음 단계
+## 15. 다음 단계
 
-1. ✅ SPEC v0.3 — **리뷰 요청**
-2. ⏸ `DESIGN.md` 작성
-3. ⏸ `DESIGN.md` 승인
-4. ⏸ 레포 스캐폴딩 + CI/CD
-5. ⏸ 구현 착수 (뷰 단위 수직 슬라이스)
+1. ✅ SPEC v0.3-impl — 현재 구현 기준 정합성 반영
+2. ✅ Flow chart SSE/invalidation 구현
+3. ✅ retention 자동화 + daily rollup 구현
+4. ✅ system notification 권한 플로우와 UI 연결

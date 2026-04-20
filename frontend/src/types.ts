@@ -10,10 +10,10 @@ export interface KPISummary {
 }
 
 export interface CurrentSession {
-  id: string;
-  startedAt: string;
-  project: string;
-  model: string;
+  id: string | null;
+  startedAt: string | null;
+  project: string | null;
+  model: string | null;
   tokens: {
     input: number;
     output: number;
@@ -24,6 +24,8 @@ export interface CurrentSession {
   contextUsed: number;
   costUSD: number;
   messages: number;
+  compacted?: boolean;
+  ended?: string | null;
 }
 
 export interface FlowSeries {
@@ -73,7 +75,7 @@ export interface ProjectTrend {
 
 export interface TickerEvent {
   id: number;
-  t: "edited" | "read" | "grep" | "reply" | "tool" | "bash";
+  t: "edited" | "read" | "grep" | "reply" | "tool" | "bash" | "waste" | "budget" | "context" | "opus" | "api_error";
   label: string;
   tk: number;
   time: string;

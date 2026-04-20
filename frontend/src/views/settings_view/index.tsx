@@ -3,6 +3,8 @@ import { api } from "../../api/client";
 import { ApiKeyCard } from "./ApiKeyCard";
 import { BetterPromptCard } from "./BetterPromptCard";
 import { BudgetCard } from "./BudgetCard";
+import { DataCard } from "./DataCard";
+import { LlmModelCard } from "./LlmModelCard";
 import { NotificationsCard } from "./NotificationsCard";
 import { RoutingRulesCard } from "./RoutingRulesCard";
 import "./Settings.css";
@@ -28,16 +30,18 @@ export function Settings() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Settings</h1>
-          <p className="page-sub">예산 · 라우팅 · 알림 · Better prompt · API 키</p>
+          <p className="page-sub">예산 · 라우팅 · 알림 · LLM 모델 · Better prompt · API 키</p>
         </div>
       </div>
 
       <div className="vstack" style={{ gap: 16 }}>
         <BudgetCard settings={data} />
+        <LlmModelCard settings={data} />
+        <BetterPromptCard settings={data} />
         <RoutingRulesCard />
         <NotificationsCard />
-        <BetterPromptCard settings={data} />
         <ApiKeyCard />
+        <DataCard />
       </div>
     </div>
   );

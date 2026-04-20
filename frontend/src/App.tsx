@@ -2,6 +2,7 @@ import { type ReactElement, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api/client";
 import { AppShell } from "./components/AppShell";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar } from "./components/Sidebar";
 import { Topbar } from "./components/Topbar";
 import { TweaksPanel } from "./components/TweaksPanel";
@@ -63,11 +64,16 @@ export default function App() {
         sidebarPos={tweaks.sidebar_pos}
         chartStyle={tweaks.chart_style}
       >
-        {views[view]}
+        {/* Remount the boundary on view change so a fixed-up view starts clean. */}
+        <ErrorBoundary key={view} label={VIEW_LABELS[view]}>
+          {views[view]}
+        </ErrorBoundary>
       </AppShell>
       <TweaksPanel />
       {needsOnboarding && (
-        <Onboarding onClose={() => refetchOnboarding()} />
+        <ErrorBoundary label="Onboarding">
+          <Onboarding onClose={() => refetchOnboarding()} />
+        </ErrorBoundary>
       )}
     </>
   );

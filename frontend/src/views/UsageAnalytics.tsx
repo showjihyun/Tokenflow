@@ -27,11 +27,16 @@ const LEGEND = [
 
 export function UsageAnalytics() {
   const [range, setRange] = useState<Range>("7d");
+  const [project, setProject] = useState<string>("");
+  const projectRange = range === "30d" || range === "90d" || range === "all" ? "30d" : "7d";
 
-  const kpi = useQuery({ queryKey: ["analytics-kpi", range], queryFn: () => api.analyticsKpi(range) });
-  const daily = useQuery({ queryKey: ["analytics-daily", range], queryFn: () => api.analyticsDaily(range) });
-  const heat = useQuery({ queryKey: ["analytics-heatmap", range], queryFn: () => api.analyticsHeatmap(range) });
-  const cost = useQuery({ queryKey: ["analytics-cost", range], queryFn: () => api.analyticsCostBreakdown(range) });
+  const projects = useQuery({ queryKey: ["projects", projectRange], queryFn: () => api.projects(projectRange) });
+  const projectParam = project || undefined;
+  const kpi = useQuery({ queryKey: ["analytics-kpi", range, project], queryFn: () => api.analyticsKpi(range, projectParam) });
+  const daily = useQuery({ queryKey: ["analytics-daily", range, project], queryFn: () => api.analyticsDaily(range, projectParam) });
+  const heat = useQuery({ queryKey: ["analytics-heatmap", range, project], queryFn: () => api.analyticsHeatmap(range, projectParam) });
+  const cost = useQuery({ queryKey: ["analytics-cost", range, project], queryFn: () => api.analyticsCostBreakdown(range, projectParam) });
+  const topWastes = useQuery({ queryKey: ["analytics-top-wastes", range, project], queryFn: () => api.analyticsTopWastes(range, 4, projectParam) });
 
   const totalTokens = kpi.data?.totalTokens ?? 0;
   const totalCost = kpi.data?.totalCost ?? 0;
@@ -50,16 +55,31 @@ export function UsageAnalytics() {
           <h1 className="page-title">Usage Analytics</h1>
           <p className="page-sub">일/주/월별 토큰 사용 패턴 분석</p>
         </div>
-        <div className="range-picker">
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              className={range === r.key ? "active" : ""}
-              onClick={() => setRange(r.key)}
-            >
-              {r.label}
-            </button>
-          ))}
+        <div className="hstack">
+          <select
+            className="analytics-project-select"
+            value={project}
+            onChange={(e) => setProject(e.target.value)}
+            aria-label="Project filter"
+          >
+            <option value="">All projects</option>
+            {(projects.data ?? []).map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <div className="range-picker">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                className={range === r.key ? "active" : ""}
+                onClick={() => setRange(r.key)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -130,12 +150,29 @@ export function UsageAnalytics() {
           <CardHeader
             title="Top Waste Patterns"
             icon={<TrendingUp size={13} strokeWidth={1.6} />}
-            sub="Phase E"
+            sub={range.toUpperCase()}
           />
           <CardBody>
-            <div className="view-placeholder">
-              Waste pattern detection ships in Phase E.
-            </div>
+            {(topWastes.data ?? []).length === 0 ? (
+              <div className="view-placeholder">No waste patterns in this range.</div>
+            ) : (
+              <div className="vstack" style={{ gap: 10 }}>
+                {(topWastes.data ?? []).map((waste) => (
+                  <div key={waste.id} className="settings-toggle-row">
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{waste.title}</div>
+                      <div className="sub">
+                        {waste.kind} · {waste.severity} · {waste.meta}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 12 }}>
+                      <div>{fmt.k(waste.save_tokens)} tk</div>
+                      <div className="sub">{fmt.usd(waste.save_usd)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardBody>
         </Card>
 

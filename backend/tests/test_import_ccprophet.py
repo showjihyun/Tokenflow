@@ -4,10 +4,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
+from fastapi.testclient import TestClient
 
 from tokenflow.adapters.persistence import migrations
 from tokenflow.adapters.persistence.import_ccprophet import import_from_ccprophet
 from tokenflow.adapters.persistence.repository import Repository
+from tokenflow.adapters.web.app import create_app
 
 
 def _build_ccprophet_db(path: Path) -> None:
@@ -48,3 +50,20 @@ def test_import_copies_sessions(tmp_path: Path) -> None:
     counts2 = import_from_ccprophet(src, repo)
     assert counts2["sessions"] == 0
     repo.close()
+
+
+def test_import_ccprophet_rest_job(tmp_path: Path) -> None:
+    src = tmp_path / "ccprophet.duckdb"
+    _build_ccprophet_db(src)
+
+    with TestClient(create_app()) as c:
+        r = c.post("/api/import/ccprophet", json={"path": str(src)})
+        assert r.status_code == 200
+        job_id = r.json()["job_id"]
+
+        status = c.get(f"/api/import/ccprophet/status/{job_id}")
+        assert status.status_code == 200
+        body = status.json()
+        assert body["state"] in ("done", "running", "queued")
+        if body["state"] == "done":
+            assert "counts" in body

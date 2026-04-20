@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import hashlib
 import json
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,16 +16,15 @@ from tokenflow.adapters.persistence.repository import Repository
 logger = logging.getLogger(__name__)
 
 
-_SLUG_CACHE: dict[str, str] = {}
 _SLUG_MAX_DEPTH = 12
 
 
+@functools.lru_cache(maxsize=1024)
 def _project_slug_from_cwd(cwd: str | None) -> str:
+    """Walk up from cwd to the nearest .git root; cache with an LRU cap so long-running
+    servers don't accumulate entries for every path ever seen."""
     if not cwd:
         return "unknown"
-    cached = _SLUG_CACHE.get(cwd)
-    if cached is not None:
-        return cached
     try:
         p = Path(cwd)
         git_root = p
@@ -33,16 +33,11 @@ def _project_slug_from_cwd(cwd: str | None) -> str:
         # the asyncio loop while EventTailer handles a single event.
         while git_root != git_root.parent and depth < _SLUG_MAX_DEPTH:
             if (git_root / ".git").exists():
-                slug = git_root.name
-                _SLUG_CACHE[cwd] = slug
-                return slug
+                return git_root.name
             git_root = git_root.parent
             depth += 1
-        slug = p.name or "unknown"
-        _SLUG_CACHE[cwd] = slug
-        return slug
+        return p.name or "unknown"
     except Exception:
-        _SLUG_CACHE[cwd] = "unknown"
         return "unknown"
 
 
@@ -96,11 +91,15 @@ class EventTailer:
         self,
         repo: Repository,
         publish: Callable[[dict[str, Any]], None] | None = None,
+        is_paused: Callable[[], bool] | None = None,
         poll_interval: float = 1.0,
+        inactivity_timeout: timedelta = timedelta(minutes=15),
     ):
         self.repo = repo
         self.publish = publish or (lambda _e: None)
+        self.is_paused = is_paused or (lambda: False)
         self.poll_interval = poll_interval
+        self.inactivity_timeout = inactivity_timeout
         self._stop = asyncio.Event()
         self._ndjson_path = paths.events_ndjson_path()
 
@@ -115,6 +114,7 @@ class EventTailer:
 
         while not self._stop.is_set():
             try:
+                self._end_inactive_sessions()
                 offset = await self._process_new(offset)
             except Exception:
                 logger.exception("EventTailer: unexpected error")
@@ -122,6 +122,17 @@ class EventTailer:
                 await asyncio.wait_for(self._stop.wait(), timeout=self.poll_interval)
             except TimeoutError:
                 continue
+
+    def _end_inactive_sessions(self) -> None:
+        cutoff = datetime.now(tz=UTC) - self.inactivity_timeout
+        ended = self.repo.mark_inactive_sessions_ended(cutoff=cutoff)
+        if ended:
+            self.publish({
+                "hook_event_name": "SessionEnd",
+                "session_id": "inactive",
+                "reason": "inactivity",
+                "ended_count": ended,
+            })
 
     async def _process_new(self, offset: int) -> int:
         try:
@@ -155,6 +166,9 @@ class EventTailer:
             if not isinstance(payload, dict):
                 continue
             try:
+                if self.is_paused():
+                    payload = dict(payload)
+                    payload["paused"] = True
                 evt_id = apply_event(self.repo, payload)
                 # Suppress SSE publish when reprocessing after rotation —
                 # callers don't want the ticker to replay ancient events.
@@ -165,6 +179,10 @@ class EventTailer:
                         "transcript_path": payload.get("transcript_path"),
                         "tool_name": payload.get("tool_name"),
                     })
+                    if payload.get("hook_event_name") == "SessionEnd" and not payload.get("paused"):
+                        from tokenflow.use_cases.detect_waste import run_detectors
+
+                        run_detectors(self.repo, session_id=str(payload.get("session_id") or "unknown"), publish=self.publish)
             except Exception:
                 logger.exception("EventTailer: apply_event failed")
 

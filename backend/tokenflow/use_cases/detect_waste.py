@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def _load_messages(repo: Repository, since: datetime | None = None, session_id: str | None = None) -> list[MessageRow]:
     params: list[Any] = []
-    filters = []
+    filters = ["COALESCE(paused, FALSE) = FALSE"]
     if since is not None:
         filters.append("ts >= ?")
         params.append(since)
@@ -45,7 +45,7 @@ def _load_messages(repo: Repository, since: datetime | None = None, session_id: 
 
 def _load_events(repo: Repository, since: datetime | None = None, session_id: str | None = None) -> list[EventRow]:
     params: list[Any] = []
-    filters = []
+    filters = ["COALESCE(payload->>'paused', 'false') != 'true'"]
     if since is not None:
         filters.append("ts >= ?")
         params.append(since)

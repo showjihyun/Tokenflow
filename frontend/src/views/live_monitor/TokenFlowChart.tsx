@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
 import { LineChart } from "lucide-react";
-import { api } from "../../api/client";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { AreaChart } from "../../components/charts/AreaChart";
+import { useSSE } from "../../hooks/useSSE";
+import type { FlowResponse } from "../../types";
 
 const LEGEND = [
   { label: "Opus", color: "var(--violet)" },
@@ -12,16 +12,17 @@ const LEGEND = [
 ];
 
 export function TokenFlowChart() {
-  const { data } = useQuery({
-    queryKey: ["flow", "60m"],
-    queryFn: () => api.currentSessionFlow("60m"),
-    refetchInterval: 10_000,
+  const { events, status } = useSSE<FlowResponse>({
+    url: "/api/sessions/current/flow/stream?window=60m",
+    event: "flow",
+    bufferSize: 1,
   });
+  const data = events[0];
 
   return (
     <Card>
       <CardHeader
-        title="Token Flow · Last 60 minutes"
+        title="Token Flow - Last 60 minutes"
         icon={<LineChart size={13} strokeWidth={1.6} />}
         action={
           <div className="chart-legend">
@@ -44,7 +45,7 @@ export function TokenFlowChart() {
           />
         ) : (
           <div style={{ height: 220, color: "var(--fg-3)", textAlign: "center", paddingTop: 90 }}>
-            Loading flow…
+            {status === "closed" ? "Flow stream disconnected" : "Loading flow..."}
           </div>
         )}
       </CardBody>

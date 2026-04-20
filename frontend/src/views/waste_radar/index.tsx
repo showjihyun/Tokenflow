@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   AlertTriangle,
   Check,
@@ -41,6 +42,10 @@ function iconFor(kind: WasteKind) {
 
 export function WasteRadar() {
   const qc = useQueryClient();
+  const [appliedPreview, setAppliedPreview] = useState<{
+    outcome: string;
+    preview: { path: string; title: string; diff: string } | null;
+  } | null>(null);
   const { data: wastes, isLoading } = useQuery({
     queryKey: ["wastes", "active"],
     queryFn: () => api.listWastes("active"),
@@ -65,7 +70,8 @@ export function WasteRadar() {
   });
   const apply = useMutation({
     mutationFn: (id: string) => api.applyWaste(id),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setAppliedPreview({ outcome: result.outcome, preview: result.preview });
       qc.invalidateQueries({ queryKey: ["wastes"] });
       qc.invalidateQueries({ queryKey: ["routing-rules"] });
     },
@@ -108,6 +114,31 @@ export function WasteRadar() {
       </div>
 
       {isLoading && <div className="view-placeholder">Loading waste patterns…</div>}
+
+      {appliedPreview && (
+        <Card>
+          <CardHeader
+            title={appliedPreview.preview?.title ?? "Fix applied"}
+            icon={<Check size={13} strokeWidth={1.6} />}
+            sub={appliedPreview.outcome}
+            action={
+              <Button variant="ghost" size="sm" onClick={() => setAppliedPreview(null)}>
+                <X size={12} strokeWidth={1.8} /> Close
+              </Button>
+            }
+          />
+          <CardBody>
+            {appliedPreview.preview ? (
+              <>
+                <div className="waste-preview-path">{appliedPreview.preview.path}</div>
+                <pre className="waste-preview-diff">{appliedPreview.preview.diff}</pre>
+              </>
+            ) : (
+              <div className="view-placeholder">No preview was generated for this fix.</div>
+            )}
+          </CardBody>
+        </Card>
+      )}
 
       {!isLoading && active.length === 0 && (
         <Card>

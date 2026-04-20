@@ -42,6 +42,7 @@
 }
 
 .icon-btn {
+  position: relative;
   width: 30px;
   height: 30px;
   display: inline-flex;
@@ -52,6 +53,104 @@
   transition:
     background 0.12s,
     color 0.12s;
+}
+
+.bell-wrap {
+  position: relative;
+}
+
+.bell-dot {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 99px;
+  background: var(--red);
+  color: white;
+  font-size: 9px;
+  line-height: 14px;
+  font-family: var(--font-mono);
+}
+
+.bell-menu {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.bell-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bell-menu-head button {
+  color: var(--fg-2);
+  font-size: 11px;
+}
+
+.bell-menu-head button:disabled {
+  color: var(--fg-3);
+  cursor: default;
+}
+
+.bell-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.bell-empty {
+  padding: 18px 12px;
+  color: var(--fg-3);
+  font-size: 12px;
+}
+
+.bell-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bell-item:last-child {
+  border-bottom: 0;
+}
+
+.bell-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-0);
+}
+
+.bell-item-top time {
+  flex: 0 0 auto;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+}
+
+.bell-item-body {
+  margin-top: 4px;
+  color: var(--fg-2);
+  font-size: 11.5px;
+  line-height: 1.4;
 }
 
 .icon-btn:hover {

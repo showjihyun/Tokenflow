@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-import contextlib
 import json
-import os
-import stat
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from tokenflow.adapters.persistence import paths
+from tokenflow.adapters.coach.client import DEFAULT_MODEL, SUPPORTED_MODELS
+from tokenflow.adapters.persistence import secret_store
 from tokenflow.adapters.persistence.repository import Repository
 from tokenflow.adapters.web.deps import get_repo
 
@@ -30,6 +28,8 @@ class TweaksPayload(BaseModel):
     alert_level: Literal["quiet", "balanced", "loud"] | None = None
     lang: Literal["ko", "en"] | None = None
     better_prompt_mode: Literal["static", "llm"] | None = None
+    # LLM model for AI Coach + better-prompt LLM mode. Clamped server-side to SUPPORTED_MODELS.
+    llm_model: Literal["claude-sonnet-4-6", "claude-opus-4-7"] | None = None
 
 
 class ApiKeyPayload(BaseModel):
@@ -56,6 +56,11 @@ def _serialize_config(cfg: dict[str, Any]) -> dict[str, Any]:
             "alert_level": cfg.get("alert_level", "balanced"),
             "lang": cfg.get("lang", "ko"),
             "better_prompt_mode": cfg.get("better_prompt_mode", "static"),
+            "llm_model": cfg.get("llm_model") or DEFAULT_MODEL,
+        },
+        "llm": {
+            "model": cfg.get("llm_model") or DEFAULT_MODEL,
+            "supported": list(SUPPORTED_MODELS),
         },
     }
 
@@ -84,38 +89,20 @@ async def patch_tweaks(payload: TweaksPayload, repo: Repository = Depends(get_re
 
 @router.get("/settings/api-key/status")
 async def api_key_status() -> dict[str, Any]:
-    """Report presence + parseability so the UI can recover from a corrupt secret.json."""
-    secret = paths.secret_path()
-    if not secret.exists():
-        return {"configured": False, "valid": False}
-    try:
-        payload = json.loads(secret.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
-        return {"configured": True, "valid": False, "error": f"cannot read secret.json: {e}"}
-    if not isinstance(payload, dict):
-        return {"configured": True, "valid": False, "error": "secret.json is not a JSON object"}
-    key = payload.get("anthropic_api_key")
-    if not isinstance(key, str) or not key.strip():
-        return {"configured": True, "valid": False, "error": "anthropic_api_key missing or empty"}
-    return {"configured": True, "valid": True}
+    """Report presence + backend (keyring vs file) so the UI can surface it."""
+    return secret_store.status()
 
 
 @router.post("/settings/api-key")
-async def set_api_key(payload: ApiKeyPayload) -> dict[str, bool]:
-    if not payload.key.strip():
-        raise HTTPException(status_code=400, detail="empty key")
-    secret = paths.secret_path()
-    secret.parent.mkdir(parents=True, exist_ok=True)
-    secret.write_text(json.dumps({"anthropic_api_key": payload.key.strip()}), encoding="utf-8")
-    # Tighten perms on POSIX (best-effort on Windows)
-    with contextlib.suppress(OSError):
-        os.chmod(secret, stat.S_IRUSR | stat.S_IWUSR)
-    return {"configured": True}
+async def set_api_key(payload: ApiKeyPayload) -> dict[str, Any]:
+    try:
+        backend = secret_store.set_api_key(payload.key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"configured": True, "backend": backend}
 
 
 @router.delete("/settings/api-key")
 async def delete_api_key() -> dict[str, bool]:
-    secret = paths.secret_path()
-    if secret.exists():
-        secret.unlink()
+    secret_store.delete_api_key()
     return {"configured": False}

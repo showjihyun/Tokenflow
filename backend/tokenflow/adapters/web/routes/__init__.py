@@ -4,6 +4,7 @@ from . import (
     analytics,
     coach,
     events,
+    imports,
     kpi,
     onboarding,
     projects,
@@ -11,6 +12,7 @@ from . import (
     rules_and_notifs,
     sessions,
     settings,
+    system,
     wastes,
 )
 
@@ -21,10 +23,12 @@ api_router.include_router(projects.router)
 api_router.include_router(events.router)
 api_router.include_router(analytics.router)
 api_router.include_router(settings.router)
+api_router.include_router(system.router)
 api_router.include_router(onboarding.router)
 api_router.include_router(wastes.router)
 api_router.include_router(coach.router)
 api_router.include_router(replay.router)
+api_router.include_router(imports.router)
 api_router.include_router(rules_and_notifs.router)
 
 __all__ = ["api_router"]

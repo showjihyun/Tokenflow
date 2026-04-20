@@ -255,3 +255,15 @@
   height: 6px;
   border-radius: 50%;
 }
+
+.analytics-project-select {
+  height: 31px;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--fg-0);
+  font: 11.5px var(--font-mono);
+}

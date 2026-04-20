@@ -15,7 +15,8 @@ def test_health_ok() -> None:
         body = r.json()
         assert body["status"] == "ok"
         assert body["db"] == "ok"
-        assert body["hook"] == "not-connected"
+        # Fresh DB = no events ingested = hook status "disconnected" per system.py taxonomy.
+        assert body["hook"] == "disconnected"
 
 
 def test_empty_db_returns_empty_shapes() -> None:

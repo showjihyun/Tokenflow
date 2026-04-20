@@ -43,13 +43,17 @@ def serve(
 ) -> None:
     from tokenflow.adapters.web.app import create_app
 
-    repo_root = Path(__file__).resolve().parents[3]
-    frontend_dist = repo_root / "frontend" / "dist"
-    app_instance = create_app(frontend_dist=None if dev else frontend_dist)
+    frontend_dist = None if dev else paths.frontend_dist_dir()
+    app_instance = create_app(frontend_dist=frontend_dist)
 
     console.print(f"[bold]Token Flow[/bold] v{__version__} on http://{host}:{port}")
     if dev:
         console.print("[dim]dev mode - frontend expected at http://localhost:5173[/dim]")
+    elif frontend_dist is None:
+        console.print("[yellow]warning: frontend build not found - API only.[/yellow]")
+        console.print("[dim]run `npm run build` in ../frontend or reinstall the wheel.[/dim]")
+    else:
+        console.print(f"[dim]serving SPA from {frontend_dist}[/dim]")
     uvicorn.run(app_instance, host=host, port=port, log_level="info")
 
 

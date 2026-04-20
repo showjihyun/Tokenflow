@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -52,6 +52,15 @@ def test_apply_event_deduplicates() -> None:
     second = apply_event(repo, payload)
     assert first is not None
     assert second is None  # duplicate
+
+
+def test_inactive_session_is_marked_ended() -> None:
+    repo = _init_db()
+    old = datetime.now(tz=UTC) - timedelta(minutes=30)
+    repo.upsert_session_started("stale_s1", "proj", "claude-sonnet-4-6", old)
+    ended = repo.mark_inactive_sessions_ended(cutoff=datetime.now(tz=UTC) - timedelta(minutes=15))
+    assert ended == 1
+    assert repo.get_current_session() is None
 
 
 def test_parse_line_extracts_usage() -> None:

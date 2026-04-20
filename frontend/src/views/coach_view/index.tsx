@@ -30,6 +30,7 @@ export function AICoach() {
   const session = useQuery({ queryKey: ["session-current"], queryFn: () => api.currentSession() });
   const budget = useQuery({ queryKey: ["kpi-budget"], queryFn: () => api.kpiBudget() });
   const wastes = useQuery({ queryKey: ["wastes", "active"], queryFn: () => api.listWastes("active") });
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings() });
 
   useEffect(() => {
     if (!activeThread && threads.data && threads.data.length > 0) {
@@ -93,6 +94,14 @@ export function AICoach() {
 
   const activeThreadObj = threads.data?.find((t) => t.id === activeThread);
   const threadCost = activeThreadObj?.cost_usd_total ?? 0;
+  const estTokens = Math.max(1, Math.ceil(draft.trim().length / 4));
+  const estRate =
+    settings.data?.llm.model === "claude-opus-4-7"
+      ? { input: 15, output: 75 }
+      : { input: 3, output: 15 };
+  const estCost = draft.trim()
+    ? (estTokens / 1_000_000) * estRate.input + (Math.ceil(estTokens * 0.8) / 1_000_000) * estRate.output
+    : 0;
 
   return (
     <div className="page">
@@ -145,7 +154,8 @@ export function AICoach() {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 500 }}>TokenFlow Coach</div>
               <div style={{ fontSize: 11, color: "var(--fg-3)", fontFamily: "var(--font-mono)" }}>
-                Sonnet 4.6 · analyzing live usage
+                {settings.data?.llm.model === "claude-opus-4-7" ? "Opus 4.7" : "Sonnet 4.6"}
+                {" · analyzing live usage"}
               </div>
             </div>
           </div>
@@ -196,7 +206,10 @@ export function AICoach() {
                 }}
               />
               <div className="coach-input-row">
-                <span>Enter 전송 · Shift+Enter 줄바꿈</span>
+                <span>
+                  Enter 전송 · Shift+Enter 줄바꿈
+                  {draft.trim() ? ` · Est. cost ${fmt.usd(estCost)}` : ""}
+                </span>
                 <Button variant="primary" size="sm" onClick={onSend} disabled={!draft.trim() || sendMessage.isPending}>
                   <Send size={12} strokeWidth={1.8} /> Send
                 </Button>

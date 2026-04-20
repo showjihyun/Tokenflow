@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { FileText, Pause } from "lucide-react";
 import { api } from "../../api/client";
 import { Button } from "../../components/Button";
@@ -14,9 +15,28 @@ import { ProjectsTable } from "./ProjectsTable";
 import { TokenFlowChart } from "./TokenFlowChart";
 
 export function LiveMonitor() {
+  const [paused, setPaused] = useState(false);
   const { data: session } = useQuery({
     queryKey: ["session-current"],
     queryFn: () => api.currentSession(),
+  });
+  const pauseMutation = useMutation({
+    mutationFn: (next: boolean) => api.pauseIngestion(next),
+    onSuccess: (data) => setPaused(data.paused),
+  });
+
+  const exportMutation = useMutation({
+    mutationFn: async () => {
+      if (!session?.id) return;
+      const payload = await api.exportSession(session.id);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `tokenflow-${session.id}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
   });
 
   return (
@@ -26,7 +46,7 @@ export function LiveMonitor() {
           <h1 className="page-title">Live Monitor</h1>
           <p className="page-sub">
             실시간 세션{" "}
-            {session && (
+            {session?.id && (
               <span className="mono dim">
                 · {session.id} · {session.project}
               </span>
@@ -34,10 +54,10 @@ export function LiveMonitor() {
           </p>
         </div>
         <div className="hstack">
-          <Button variant="ghost" size="sm">
-            <Pause size={13} strokeWidth={1.8} /> Pause tracking
+          <Button variant="ghost" size="sm" onClick={() => pauseMutation.mutate(!paused)}>
+            <Pause size={13} strokeWidth={1.8} /> {paused ? "Resume tracking" : "Pause tracking"}
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={() => exportMutation.mutate()} disabled={!session?.id}>
             <FileText size={13} strokeWidth={1.8} /> Export session
           </Button>
         </div>

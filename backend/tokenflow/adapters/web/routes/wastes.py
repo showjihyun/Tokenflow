@@ -13,6 +13,37 @@ from tokenflow.use_cases.detect_waste import run_detectors, run_hourly_sweep
 router = APIRouter(tags=["wastes"])
 
 
+def _claude_md_preview(waste: dict[str, Any]) -> dict[str, Any] | None:
+    kind = str(waste.get("kind") or "")
+    title = str(waste.get("title") or kind)
+    meta = str(waste.get("meta") or "")
+    snippets = {
+        "big-file-load": [
+            "## Token Flow: Large file reads",
+            "- Before reading large files, prefer grep/glob to locate the exact symbol or section.",
+            "- If full-file context is required, summarize why and read the smallest relevant range first.",
+        ],
+        "repeat-question": [
+            "## Token Flow: Repeated questions",
+            f"- Reuse the saved answer for: {title}.",
+            "- Add durable project facts here after resolving repeated questions.",
+        ],
+        "tool-loop": [
+            "## Token Flow: Tool loop recovery",
+            f"- If this pattern repeats ({meta or title}), stop and inspect the prior command/error before retrying.",
+            "- Prefer one diagnostic command, then update the command or ask for missing context.",
+        ],
+    }
+    lines = snippets.get(kind)
+    if not lines:
+        return None
+    return {
+        "path": "CLAUDE.md",
+        "title": f"Append {kind} guidance",
+        "diff": "\n".join(["--- CLAUDE.md", "+++ CLAUDE.md", "@@", *[f"+{line}" for line in lines]]),
+    }
+
+
 @router.get("/wastes")
 async def list_wastes(
     status: Literal["active", "dismissed"] = "active",
@@ -35,6 +66,7 @@ async def apply(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str
     if not waste:
         raise HTTPException(404)
     kind = waste["kind"]
+    preview = _claude_md_preview(waste)
     if kind == "wrong-model":
         repo.upsert_routing_rule(
             rule_id=f"auto-{waste_id[:8]}",
@@ -44,6 +76,15 @@ async def apply(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str
             priority=10,
         )
         outcome = "routing-rule-added"
+        preview = {
+            "path": "settings/routing-rules",
+            "title": "Add auto-routing rule",
+            "diff": (
+                "+ condition: Simple edits (auto from waste)\n"
+                "+ target_model: claude-haiku-4-5\n"
+                "+ priority: 10"
+            ),
+        }
     elif kind == "big-file-load":
         outcome = "claude-md-snippet-proposed"
     elif kind == "repeat-question":
@@ -53,7 +94,7 @@ async def apply(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str
     else:
         outcome = "claude-md-snippet-proposed"
     repo.mark_waste_applied(waste_id, outcome)
-    return {"ok": True, "outcome": outcome}
+    return {"ok": True, "outcome": outcome, "preview": preview}
 
 
 @router.post("/wastes/scan")
