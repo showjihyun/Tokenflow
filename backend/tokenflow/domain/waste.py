@@ -288,3 +288,38 @@ def detect_tool_loop(events: list[EventRow], *, min_count: int = 5) -> list[Wast
             )
         )
     return out
+
+
+# ---------- opus overuse (budget-wide, not per-session) ----------
+
+# SPEC §11 #15 — Opus 월 비용 점유율 임계값.
+# 15% 권장 한계, 25% 알림 발사.
+OPUS_OVERUSE_WARN_SHARE: float = 0.15
+OPUS_OVERUSE_ALERT_SHARE: float = 0.25
+
+
+def evaluate_opus_overuse(
+    *,
+    opus_cost_usd: float,
+    total_cost_usd: float,
+    warn_share: float = OPUS_OVERUSE_WARN_SHARE,
+    alert_share: float = OPUS_OVERUSE_ALERT_SHARE,
+) -> tuple[float, Severity] | None:
+    """Return ``(share, severity)`` when Opus cost share crosses the warn
+    threshold, otherwise ``None``.
+
+    Pure policy function: caller is responsible for aggregating costs over
+    the observation window (typically the current calendar month) and
+    feeding totals in. The separation keeps the detector testable without
+    touching DuckDB and lets the scheduler/publisher decide *when* to run
+    this check (SessionEnd, hourly sweep, SSE event publisher — tracked in
+    §12 ``System notifications``).
+    """
+    if total_cost_usd <= 0 or opus_cost_usd < 0:
+        return None
+    share = opus_cost_usd / total_cost_usd
+    if share >= alert_share:
+        return share, "high"
+    if share >= warn_share:
+        return share, "med"
+    return None

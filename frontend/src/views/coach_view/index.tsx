@@ -78,18 +78,15 @@ export function AICoach() {
     },
   });
 
-  const onSend = () => {
+  const onSend = async () => {
     if (!draft.trim()) return;
     const content = draft.trim();
     setDraft("");
 
     if (!activeThread) {
       // Auto-create a thread with the first message as title
-      createThread.mutate(content.slice(0, 40), {
-        onSuccess: (thread) => {
-          sendMessage.mutate({ threadId: thread.id, content });
-        },
-      });
+      const thread = await createThread.mutateAsync(content.slice(0, 40));
+      sendMessage.mutate({ threadId: thread.id, content });
     } else {
       sendMessage.mutate({ threadId: activeThread, content });
     }
@@ -230,7 +227,12 @@ export function AICoach() {
                   {draft.trim() ? ` · Est. cost ${fmt.usd(estCost)}` : ""}
                   {quality.data ? ` · Quality ${quality.data.grade} (${quality.data.score})` : ""}
                 </span>
-                <Button variant="primary" size="sm" onClick={onSend} disabled={!draft.trim() || sendMessage.isPending}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={onSend}
+                  disabled={!draft.trim() || createThread.isPending || sendMessage.isPending}
+                >
                   <Send size={12} strokeWidth={1.8} /> Send
                 </Button>
               </div>

@@ -110,7 +110,7 @@ Token Flow = ccprophet 코어 흡수 + 새 UI.
 | Charts | 직접 SVG | |
 | Icons | Lucide React | |
 | AI Coach LLM | Claude Sonnet 4.6 | |
-| Test | pytest + vitest + @testing-library/react | |
+| Test | pytest + vitest + @testing-library/react + Playwright (e2e) | |
 | Lint | ruff + mypy strict + eslint | prettier 는 현재 미도입 |
 | 패키징 | uv + npm | frontend 는 `package-lock.json` 기준 |
 | 배포 | 로컬 실행만 | |
@@ -213,17 +213,18 @@ Claude Code 훅 payload 에 **토큰 카운트 없음** (공식 문서 확인). 
 
 **Step 2 — Hook 자동 설치 제안**
 - `not_installed` 또는 `partial` 이면 "Install hook into Claude Code?" 액션 표시
-- `Allow` → `settings.json` 에 다음 hook 블록 append (기존 설정 보존, `.bak` 백업)
+- `Allow` → `settings.json` 에 다음 hook 블록 append (기존 설정 보존, 타임스탬프 + 랜덤 suffix `.bak` 백업)
   ```json
   {
     "hooks": {
-      "SessionStart": [{ "matcher": "", "hooks": [{ "type": "command", "command": "tokenflow-hook" }]}],
-      "PostToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "tokenflow-hook" }]}],
-      "SessionEnd": [{ "matcher": "", "hooks": [{ "type": "command", "command": "tokenflow-hook" }]}],
-      "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "tokenflow-hook" }]}]
+      "SessionStart":     [{ "matcher": "",  "hooks": [{ "type": "command", "command": "<absolute path to tokenflow-hook>" }]}],
+      "PostToolUse":      [{ "matcher": ".*","hooks": [{ "type": "command", "command": "<absolute path to tokenflow-hook>" }]}],
+      "SessionEnd":       [{ "matcher": "",  "hooks": [{ "type": "command", "command": "<absolute path to tokenflow-hook>" }]}],
+      "UserPromptSubmit": [{ "matcher": "",  "hooks": [{ "type": "command", "command": "<absolute path to tokenflow-hook>" }]}]
     }
   }
   ```
+- `command` 절대경로는 `installer.resolve_hook_command()` 가 결정: ① `shutil.which("tokenflow-hook")` → ② `Path(sys.executable).parent / "tokenflow-hook[.exe]"` → ③ POSIX `<prefix>/bin/tokenflow-hook` → ④ bare name fallback. Claude Code 는 hook 을 venv 밖에서 실행하므로 bare 이름을 박으면 silent "command not found" 실패가 발생 — v1.1 에서 bug fix 됨.
 - `Skip` → 수동 설치 안내 화면 (복사 가능한 JSON 스니펫)
 
 **Step 3 — Claude API 키 입력 (선택)**
@@ -690,8 +691,8 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | API 키 파일 권한 0600 아님 | 파일 저장 시 best-effort chmod | 실패 시 저장은 유지하되 health/status 에서 점검 가능 |
 
 ### 10.5 관측성
-- `~/.tokenflow/logs/` 회전 로그 (7일)
-- 디버그 레벨 env `TOKENFLOW_LOG_LEVEL`
+- 현재 구현: stdlib `logging` 기본 설정 (uvicorn stderr). 모듈별 `logging.getLogger(__name__)` 사용.
+- v1.1 계획: `~/.tokenflow/logs/` 로테이팅 핸들러(7일), JSON formatter, `TOKENFLOW_LOG_LEVEL` env, 요청 scope correlation ID (§12 tracking 참조)
 
 ### 10.6 기타
 - I18n: 한국어/영어. 날짜·숫자는 사용자 lang 에 따라 `Intl` 포맷. TZ 는 브라우저 로컬.
@@ -748,6 +749,8 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | Query Quality Score | `/coach/query-quality` 정적 scoring API + Coach composer grade/signal UI 구현 | 완료. signal별 rewrite suggestion 은 추가 개선 |
 | Bell notification center | Topbar Bell 최근 10개 persisted in-app 알림, unread badge, dropdown open read-all, 개별 read, Clear all 구현 | 완료. persisted notification filter/search 는 추가 개선 |
 | System notifications | in-app/system preference, 브라우저 Notification 지원/권한 플로우, waste, SessionEnd, budget threshold, context saturation, Opus overuse, API error 이벤트 연결 | 완료. 더 세밀한 알림 빈도 제어는 추가 개선 |
+| 구조화 로깅 / 로그 로테이션 | stdlib `logging` 기본 설정 (stderr). `~/.tokenflow/logs/` 로테이팅 핸들러·JSON formatter·`TOKENFLOW_LOG_LEVEL`·request correlation ID 는 v1.1 작업 | SPEC 이 더 정확. `~/.tokenflow/logs/migration_failed.log` 를 언급하는 §10.4 와 연동해 v1.1 에서 동시 정비 |
+| Hard budget 한계 도달 알림 | `hard_block` 설정 컬럼은 존재하나 budget-threshold 이벤트를 SSE 로 발사하는 publisher 부재 (ticker 렌더 경로만 있음) | SPEC §11 #4 기준 "v1 알림" 약속 — publisher 누락 보완 필요 (v1.1) |
 
 ---
 
@@ -788,3 +791,56 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 2. ✅ Flow chart SSE/invalidation 구현
 3. ✅ retention 자동화 + daily rollup 구현
 4. ✅ system notification 권한 플로우와 UI 연결
+
+## 16. Current Implementation Contract (2026-04-21)
+
+This section is the readable source of truth for the current code baseline. Some older Korean sections in this file are mojibake in local terminal output; use this section when checking current SPEC/API/test alignment.
+
+### Implemented Core Surface
+
+- Live Monitor: current session, today total, Efficiency Score, Wasted Tokens, model distribution, context window, budget card, and projects table are wired to real API data.
+- Token Flow: `/api/sessions/current/flow/stream` is the primary SSE snapshot/invalidation channel. REST snapshot remains as fallback.
+- Activity/Bell notifications: Topbar and ActivityTicker share one ticker bridge. Bell uses persisted in-app history, unread count, open-read-all, individual read, and clear-all APIs.
+- Usage Analytics: range and project filters are passed to KPI, daily, heatmap, cost breakdown, and top-wastes APIs.
+- Top Wastes: `/api/analytics/top-wastes` returns aggregate ranking by waste kind rather than raw row listing.
+- Waste Radar: active waste cards, savings summary, scan/sweep, dismiss, apply preview, and `CLAUDE.md` confirm-apply are implemented.
+- AI Coach: API-key gating, estimated send cost, Query Quality Score, thread creation, and message send flow are implemented. If no thread exists, first send must create a thread and then POST the message.
+- Session Replay: paused transcript messages are excluded by default from replay/export/list analytical surfaces; `include_paused=true` enables forensic/debug view.
+- Settings: budget, LLM model, better prompt mode, routing rules, notification preferences, API key, and Data card(vacuum/backups/ccprophet import job/status) are wired.
+- Onboarding: hook status, API key status, ccprophet candidate detection, and complete flow are implemented.
+- Retention/Data: 180-day detailed retention, daily rollup, vacuum, backup list, and migration backup are part of the implementation contract.
+
+### Playwright Contract
+
+`frontend/e2e/spec-core.spec.ts` fixes the browser-level SPEC contract with mocked API responses:
+
+- Live Monitor + Bell notification dropdown/read-all
+- Usage Analytics project-scoped API calls
+- Waste Radar apply preview + `CLAUDE.md` confirm
+- AI Coach query quality + estimated cost + thread/message send
+- Session Replay `include_paused`
+- Settings notification preference + vacuum/backups/import status
+- Onboarding complete
+
+`frontend/e2e-real/actual-data.spec.ts` validates the real local server at `http://127.0.0.1:8765` with real DuckDB data:
+
+- Live Monitor renders from real API data
+- Analytics project filter calls real project-scoped APIs
+- Replay `include_paused` calls the real endpoint
+- UI onboarding state matches real server status
+
+Latest local verification on 2026-04-21:
+
+- `npm run test:e2e`: 7 passed
+- `npm run test:e2e:real`: 4 passed
+- `npm run typecheck`: passed
+- `npm run lint`: passed
+- `npm run test -- --run`: 41 passed, 1 skipped
+- `npm run build`: passed
+
+### Remaining Gaps
+
+- Clean up the older mojibake sections in this SPEC as a dedicated documentation pass.
+- Expand Playwright from Chromium-only to Firefox/WebKit/mobile viewport matrix if release confidence requires it.
+- Strengthen hard-budget threshold event publisher. v1 remains notification-only, but event emission can be more explicit.
+- Add notification filtering/search, more detailed import progress, replay playback, and multi-session Live Monitor as v1.1 candidates.

@@ -25,7 +25,6 @@ frontend/vite.config.js
 
 # Token Flow local state
 .tokenflow/
-~/.tokenflow/
 *.duckdb
 *.duckdb.wal
 *.duckdb.tmp

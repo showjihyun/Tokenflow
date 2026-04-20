@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from tokenflow.adapters.persistence.repository import Repository
 from tokenflow.adapters.web.app import create_app
 from tokenflow.domain.waste import (
+    OPUS_OVERUSE_ALERT_SHARE,
+    OPUS_OVERUSE_WARN_SHARE,
     EventRow,
     MessageRow,
     detect_big_file_load,
@@ -14,6 +16,7 @@ from tokenflow.domain.waste import (
     detect_repeat_question,
     detect_tool_loop,
     detect_wrong_model,
+    evaluate_opus_overuse,
 )
 from tokenflow.use_cases.detect_waste import run_detectors
 
@@ -81,6 +84,41 @@ def test_detect_tool_loop_fires_on_5_repeats() -> None:
     out = detect_tool_loop(events)
     assert len(out) == 1
     assert out[0].kind == "tool-loop"
+
+
+# ---------- Opus overuse (SPEC §11 #15) ----------
+
+def test_evaluate_opus_overuse_below_warn_returns_none() -> None:
+    # 14% share → no signal
+    assert evaluate_opus_overuse(opus_cost_usd=14.0, total_cost_usd=100.0) is None
+
+
+def test_evaluate_opus_overuse_between_warn_and_alert_is_med() -> None:
+    # 20% share → warn band
+    result = evaluate_opus_overuse(opus_cost_usd=20.0, total_cost_usd=100.0)
+    assert result is not None
+    share, severity = result
+    assert severity == "med"
+    assert OPUS_OVERUSE_WARN_SHARE <= share < OPUS_OVERUSE_ALERT_SHARE
+
+
+def test_evaluate_opus_overuse_at_or_above_alert_is_high() -> None:
+    # 25% share boundary → high
+    result = evaluate_opus_overuse(opus_cost_usd=25.0, total_cost_usd=100.0)
+    assert result is not None
+    _, severity = result
+    assert severity == "high"
+
+
+def test_evaluate_opus_overuse_guards_zero_total() -> None:
+    # Don't divide by zero when no cost has accrued yet (e.g. fresh install).
+    assert evaluate_opus_overuse(opus_cost_usd=0.0, total_cost_usd=0.0) is None
+    assert evaluate_opus_overuse(opus_cost_usd=5.0, total_cost_usd=0.0) is None
+
+
+def test_evaluate_opus_overuse_rejects_negative_opus_cost() -> None:
+    # Defensive: negative cost is an upstream bug; refuse to emit a signal.
+    assert evaluate_opus_overuse(opus_cost_usd=-1.0, total_cost_usd=100.0) is None
 
 
 # ---------- Persistence + end-to-end dedup ----------

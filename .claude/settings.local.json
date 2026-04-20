@@ -111,7 +111,8 @@
       "Bash(.venv/Scripts/python.exe -m pytest tests/test_phase_d_routes.py::test_onboarding_status_and_complete -v)",
       "Bash(curl -s \"http://127.0.0.1:8765/api/sessions?limit=5\")",
       "Bash(mkdir -p \"C:/tmp/tf-scenario\")",
-      "Bash(curl -s \"http://127.0.0.1:8765/api/kpi/summary?window=today\")"
+      "Bash(curl -s \"http://127.0.0.1:8765/api/kpi/summary?window=today\")",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_phase_e_backend.py -v -k \"opus\")"
     ]
   }
 }

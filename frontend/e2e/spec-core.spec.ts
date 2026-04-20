@@ -51,6 +51,76 @@ test("SPEC replay include-paused toggle reloads replay endpoint", async ({ page 
   await expect.poll(() => apiCalls.some((call) => call.includes("/api/sessions/sess-1/replay?include_paused=true"))).toBe(true);
 });
 
+test("SPEC waste radar shows apply preview and confirms CLAUDE.md fix", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Waste Radar" }).click();
+
+  await expect(page.getByRole("heading", { name: "Waste Radar" })).toBeVisible();
+  await expect(page.getByText("Potential savings")).toBeVisible();
+  await expect(page.getByText("Context bloat")).toBeVisible();
+
+  await page.getByRole("button", { name: /Apply fix/ }).click();
+  await expect(page.getByText("CLAUDE.md diff preview")).toBeVisible();
+  await expect(page.getByText("CLAUDE.md", { exact: true })).toBeVisible();
+  await expect(page.getByText("+ Add a context hygiene rule")).toBeVisible();
+  await expect.poll(() => apiCalls).toContain("POST /api/wastes/w1/apply");
+
+  await page.getByRole("button", { name: /Apply to CLAUDE\.md/ }).click();
+  await expect(page.getByText("Applied to CLAUDE.md")).toBeVisible();
+  await expect.poll(() => apiCalls).toContain("POST /api/wastes/w1/apply-confirm");
+});
+
+test("SPEC AI Coach shows query quality, estimated cost, and sends via thread API", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "AI Coach" }).click();
+
+  await expect(page.getByRole("heading", { name: "AI Coach" })).toBeVisible();
+  await expect(page.getByText("No threads yet. Start a conversation.")).toBeVisible();
+
+  await page.locator("textarea.coach-input").fill("How should I reduce token waste in this session?");
+  await expect(page.getByText(/Est\. cost/)).toBeVisible();
+  await expect(page.getByText(/Quality B \(82\)/)).toBeVisible();
+  await expect(page.getByText("specificity 25")).toBeVisible();
+  await expect.poll(() => apiCalls).toContain("POST /api/coach/query-quality");
+
+  await page.getByRole("button", { name: /Send/ }).click();
+  await expect.poll(() => apiCalls).toContain("POST /api/coach/threads");
+  await expect.poll(() => apiCalls).toContain("POST /api/coach/threads/thread-1/messages");
+});
+
+test("SPEC settings wires notification preferences, vacuum, backups, and import status", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "Notification", {
+      configurable: true,
+      value: {
+        permission: "granted",
+        requestPermission: async () => "granted",
+      },
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings" }).click();
+
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.getByText("Notifications")).toBeVisible();
+  await expect(page.getByText("High-severity waste")).toBeVisible();
+  await page.getByRole("button", { name: "System" }).first().click();
+  await expect.poll(() => apiCalls).toContain("PATCH /api/settings/notifications/waste_high");
+
+  await expect(page.getByText("Data", { exact: true })).toBeVisible();
+  await expect(page.getByText("backup-1.duckdb")).toBeVisible();
+  await page.getByRole("button", { name: /Vacuum/ }).click();
+  await expect(page.getByText(/rolled 7 messages/)).toBeVisible();
+  await expect.poll(() => apiCalls).toContain("POST /api/system/vacuum");
+
+  await page.getByPlaceholder(/claude-prophet/).fill("C:\\tmp\\ccprophet.duckdb");
+  await page.getByRole("button", { name: /Import/ }).click();
+  await expect(page.getByText(/Job done/)).toBeVisible();
+  await expect.poll(() => apiCalls).toContain("POST /api/import/ccprophet");
+  await expect.poll(() => apiCalls).toContain("GET /api/import/ccprophet/status/job-1");
+});
+
 test("SPEC onboarding can be completed from first-run overlay", async ({ page }) => {
   await mockApi(page, { onboarded: false });
   await page.goto("/");
@@ -63,6 +133,8 @@ test("SPEC onboarding can be completed from first-run overlay", async ({ page })
 
 async function mockApi(page: Page, options: { onboarded?: boolean } = {}) {
   const onboarded = options.onboarded ?? true;
+  let coachThreadCreated = false;
+  let coachMessageSent = false;
   await page.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -99,6 +171,7 @@ async function mockApi(page: Page, options: { onboarded?: boolean } = {}) {
     if (path === "/onboarding/complete") return json(route, { onboarded: true });
     if (path === "/system/health") return json(route, { status: "ok", version: "test", db: "ok", hook: "active", api_key: "configured" });
     if (path === "/settings/notifications") return json(route, [{ key: "waste_high", enabled: true, channel: "in_app" }]);
+    if (path === "/settings/notifications/waste_high") return json(route, { key: "waste_high", enabled: true, channel: "system" });
     if (path === "/notifications/unread-count") return json(route, { count: 1 });
     if (path === "/notifications") {
       if (request.method() === "DELETE") return json(route, { ok: true, deleted: 1 });
@@ -131,12 +204,60 @@ async function mockApi(page: Page, options: { onboarded?: boolean } = {}) {
     if (path === "/projects") return json(route, [{ name: "alpha", tokens: 3000, cost: 0.4, sessions: 2, waste: 0.08, trend: "up", trendData: [1, 2, 3, 4, 5, 6, 7], range: "7d" }]);
     if (path.startsWith("/analytics/")) return json(route, analyticsResponse(path));
     if (path === "/wastes") return json(route, [waste()]);
-    if (path === "/coach/threads") return json(route, []);
     if (path === "/coach/suggestions") return json(route, ["How can I reduce waste?"]);
     if (path === "/settings/api-key/status") return json(route, { configured: true, valid: true });
     if (path === "/settings") return json(route, settings());
+    if (path === "/settings/routing-rules") return json(route, []);
+    if (path === "/system/backups") return json(route, [{ name: "backup-1.duckdb", path: "backup-1.duckdb", bytes: 4096, mtime: "2026-04-21T00:00:00Z" }]);
+    if (path === "/system/vacuum") {
+      return json(route, {
+        ok: true,
+        before_bytes: 8192,
+        after_bytes: 4096,
+        backup: { name: "backup-2.duckdb", path: "backup-2.duckdb", bytes: 8192 },
+        retention: { rolled_messages: 7, retention_days: 180 },
+      });
+    }
+    if (path === "/import/ccprophet") return json(route, { job_id: "job-1", state: "queued" });
+    if (path === "/import/ccprophet/status/job-1") {
+      return json(route, {
+        job_id: "job-1",
+        state: "done",
+        path: "C:\\tmp\\ccprophet.duckdb",
+        imported: 12,
+        skipped: 2,
+        errors: [],
+        total: 14,
+        counts: { sessions: 1, messages: 13 },
+        created_at: "2026-04-21T00:00:00Z",
+        updated_at: "2026-04-21T00:00:01Z",
+      });
+    }
     if (path === "/sessions") return json(route, [{ id: "sess-1", project: "alpha", started_at: "2026-04-21T00:00:00Z", ended_at: null, model: "claude-sonnet-4-6", tokens: 2000, cost: 0.42, messages: 2, wastes: 1 }]);
     if (path === "/sessions/sess-1/replay") return json(route, { session_id: "sess-1", summary: { messages: 1, tokens: 2000, cost: 0.42 }, events: [{ idx: 0, id: "m1", t: "message", ts: "2026-04-21T00:00:00Z", role: "user", model: null, tokens_in: 100, tokens_out: 0, cache_read: 0, cost_usd: 0, preview: "hello from replay" }] });
+    if (path === "/wastes/w1/apply") return json(route, { ok: true, outcome: "preview", preview: { path: "CLAUDE.md", title: "CLAUDE.md diff preview", diff: "+ Add a context hygiene rule" } });
+    if (path === "/wastes/w1/apply-confirm") return json(route, { ok: true, applied: true, path: "CLAUDE.md" });
+    if (path === "/coach/query-quality") {
+      return json(route, {
+        grade: "B",
+        score: 82,
+        signals: { specificity: 25, constraints: 20, context: 17, acceptance: 20 },
+      });
+    }
+    if (path === "/coach/threads") {
+      if (request.method() === "POST") {
+        coachThreadCreated = true;
+        return json(route, { id: "thread-1", title: "How should I reduce token waste", started_at: "2026-04-21T00:00:00Z", last_msg_at: "2026-04-21T00:00:00Z", cost_usd_total: 0 });
+      }
+      return json(route, coachThreadCreated ? [{ id: "thread-1", title: "How should I reduce token waste", started_at: "2026-04-21T00:00:00Z", last_msg_at: "2026-04-21T00:00:00Z", cost_usd_total: 0.01 }] : []);
+    }
+    if (path === "/coach/threads/thread-1/messages") {
+      if (request.method() === "POST") {
+        coachMessageSent = true;
+        return json(route, { id: "m-ai", thread_id: "thread-1", role: "ai", content: "Use a narrower prompt.", ts: "2026-04-21T00:00:01Z", cost_usd: 0.01 });
+      }
+      return json(route, coachMessageSent ? [{ id: "m-ai", thread_id: "thread-1", role: "ai", content: "Use a narrower prompt.", ts: "2026-04-21T00:00:01Z", cost_usd: 0.01 }] : []);
+    }
     return json(route, {});
   });
 }
