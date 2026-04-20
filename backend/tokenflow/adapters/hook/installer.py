@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,16 +17,40 @@ HOOK_EVENTS: tuple[str, ...] = ("SessionStart", "PostToolUse", "SessionEnd", "Us
 
 
 def resolve_hook_command() -> str:
-    """Return an absolute path to ``tokenflow-hook`` when we can find it,
-    otherwise fall back to the bare name.
+    """Return an absolute, cross-platform path to ``tokenflow-hook``.
 
-    Claude Code launches hooks outside of the venv, so a bare ``tokenflow-hook``
-    only works when the venv's Scripts/bin dir is on the user's PATH. Baking in
-    the absolute path at install time avoids silent "command not found" failures
-    that look to the user like "tracking is broken".
+    Claude Code spawns hooks with a clean environment that doesn't inherit the
+    venv's Scripts/bin dir on PATH, so a bare ``tokenflow-hook`` silently fails
+    with "command not found" and tracking looks broken. We resolve the absolute
+    path three ways, in order:
+
+    1. ``shutil.which`` — honors the caller's PATH (works when tokenflow is
+       installed globally or the venv is activated).
+    2. The console script sitting next to ``sys.executable`` — i.e. the venv
+       that's running the installer. ``<prefix>/Scripts/tokenflow-hook.exe`` on
+       Windows, ``<prefix>/bin/tokenflow-hook`` on POSIX. This is the common
+       case for ``uv pip install -e .``.
+    3. Bare name fallback — preserves pre-1.1 behavior for environments where
+       we really can't locate the script (e.g. weird packagings).
     """
     located = shutil.which(HOOK_COMMAND_NAME)
-    return located if located else HOOK_COMMAND_NAME
+    if located:
+        return located
+
+    exe_dir = Path(sys.executable).parent
+    suffix = ".exe" if os.name == "nt" else ""
+    candidate = exe_dir / f"{HOOK_COMMAND_NAME}{suffix}"
+    if candidate.exists():
+        return str(candidate)
+
+    # Some POSIX distros stage scripts in <prefix>/bin even when sys.executable
+    # lives in <prefix> itself (rare, but guards packaging quirks).
+    if os.name != "nt":
+        alt = exe_dir.parent / "bin" / HOOK_COMMAND_NAME
+        if alt.exists():
+            return str(alt)
+
+    return HOOK_COMMAND_NAME
 
 
 # Backward-compatible alias: existing code (and `_has_our_hook`) matches on substring.
