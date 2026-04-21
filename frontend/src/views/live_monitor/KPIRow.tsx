@@ -2,12 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { KPI } from "../../components/KPI";
 import { fmt } from "../../lib/fmt";
-import { queryKeys } from "../../lib/queryKeys";
+import { queryKeys, queryStaleTime } from "../../lib/queryKeys";
 
 export function KPIRow() {
   const { data } = useQuery({
     queryKey: queryKeys.kpiSummary("today"),
     queryFn: () => api.kpiSummary("today"),
+    staleTime: queryStaleTime.short,
     refetchInterval: 15_000,
   });
 
@@ -89,7 +90,10 @@ export function KPIRow() {
         deltaDir={data.waste.delta >= 0 ? "up" : "down"}
         sub={wasteSub}
         accent="var(--red)"
-        spark={[0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3]}
+        // Only render the sparkline when there's real waste to show. A
+        // hardcoded descending series was being drawn even for waste=0,
+        // which read as a falling-trend alert on empty data.
+        spark={data.waste.tokens > 0 ? [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3] : undefined}
         sparkColor="var(--red)"
       />
     </div>
