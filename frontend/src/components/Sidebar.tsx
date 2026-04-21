@@ -49,14 +49,21 @@ export function Sidebar({ active, onSelect }: SidebarProps) {
         <button
           className={`nav-item ${active === "settings" ? "active" : ""}`}
           onClick={() => onSelect("settings")}
+          aria-current={active === "settings" ? "page" : undefined}
         >
           <SettingsIcon size={15} strokeWidth={1.6} />
           <span>Settings</span>
         </button>
-        <button className="nav-item">
+        <a
+          className="nav-item"
+          href="https://github.com/showjihyun/Tokenflow#readme"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open Token Flow documentation in a new tab"
+        >
           <HelpCircle size={15} strokeWidth={1.6} />
           <span>Docs</span>
-        </button>
+        </a>
       </nav>
 
       <div className="sidebar-footer">

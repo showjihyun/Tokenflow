@@ -65,6 +65,7 @@
   font-size: 13px;
   width: 100%;
   text-align: left;
+  text-decoration: none;
   transition: background 0.12s;
 }
 
