@@ -2,10 +2,17 @@
 config (budget + tweaks), tailer offsets, active transcript discovery."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 from tokenflow.adapters.persistence._base import _BaseRepo, _model_key
+
+
+def _day_ts(value: date | datetime) -> float:
+    dt = value if isinstance(value, datetime) else datetime.combine(value, time.min, tzinfo=UTC)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.timestamp()
 
 
 class _AnalyticsMixin(_BaseRepo):
@@ -438,25 +445,51 @@ class _AnalyticsMixin(_BaseRepo):
     # ---------- Analytics page ----------
     def analytics_daily(self, range_: str = "30d", project: str | None = None) -> dict[str, Any]:
         days = {"24h": 1, "7d": 7, "30d": 30, "90d": 90, "all": 365}.get(range_, 30)
-        since = datetime.now(tz=UTC).timestamp() - days * 86400
-        params: list[Any] = [since]
-        join = ""
-        project_filter = ""
+        since_dt = datetime.now(tz=UTC) - timedelta(days=days)
+        agg_params: list[Any] = [since_dt.date()]
+        raw_params: list[Any] = [since_dt]
+        agg_project_filter = ""
+        raw_join = ""
+        raw_project_filter = ""
         if project:
-            join = "JOIN sessions s ON s.session_id = m.session_id"
-            project_filter = "AND s.project_slug = ?"
-            params.append(project)
+            agg_project_filter = "AND project_slug = ?"
+            raw_join = "JOIN sessions s ON s.session_id = m.session_id"
+            raw_project_filter = "AND s.project_slug = ?"
+            agg_params.append(project)
+            raw_params.append(project)
         rows = self._q(
             f"""
-            SELECT date_trunc('day', m.ts) AS d, m.model,
-                   COALESCE(SUM(input_tokens + output_tokens), 0) AS toks
-            FROM tf_messages m
-            {join}
-            WHERE m.ts >= to_timestamp(?) AND m.model IS NOT NULL AND COALESCE(paused, FALSE) = FALSE {project_filter}
-            GROUP BY d, m.model
+            SELECT d, model_key, COALESCE(SUM(toks), 0) AS toks
+            FROM (
+                SELECT day AS d, model_key,
+                       COALESCE(SUM(input_tokens + output_tokens), 0) AS toks
+                FROM daily_aggregate
+                WHERE day >= ? {agg_project_filter}
+                GROUP BY day, model_key
+                UNION ALL
+                SELECT CAST(date_trunc('day', m.ts) AS DATE) AS d,
+                       CASE
+                           WHEN lower(COALESCE(m.model, '')) LIKE '%opus%' THEN 'opus'
+                           WHEN lower(COALESCE(m.model, '')) LIKE '%haiku%' THEN 'haiku'
+                           ELSE 'sonnet'
+                       END AS model_key,
+                       COALESCE(SUM(m.input_tokens + m.output_tokens), 0) AS toks
+                FROM tf_messages m
+                {raw_join}
+                WHERE m.ts >= ?
+                  AND m.model IS NOT NULL
+                  AND COALESCE(m.paused, FALSE) = FALSE
+                  AND NOT EXISTS (
+                      SELECT 1 FROM daily_aggregate da
+                      WHERE da.day = CAST(date_trunc('day', m.ts) AS DATE)
+                  )
+                  {raw_project_filter}
+                GROUP BY d, model_key
+            )
+            GROUP BY d, model_key
             ORDER BY d
             """,
-            tuple(params),
+            tuple(agg_params + raw_params),
         )
         bucket_count = days if days <= 90 else 30
         labels: list[str] = []
@@ -469,9 +502,9 @@ class _AnalyticsMixin(_BaseRepo):
         for i in range(bucket_count):
             day = now.timestamp() - (bucket_count - 1 - i) * 86400
             labels.append(datetime.fromtimestamp(day, tz=UTC).strftime("%m-%d"))
-        for day, model, toks in rows:
-            key = _model_key(model)
-            day_ts = day.timestamp() if isinstance(day, datetime) else float(day)
+        for day, model_key, toks in rows:
+            key = _model_key(str(model_key))
+            day_ts = _day_ts(day)
             idx = int((day_ts - (now.timestamp() - bucket_count * 86400)) / 86400)
             if 0 <= idx < bucket_count:
                 buckets[key][idx] += int(toks)
@@ -525,8 +558,8 @@ class _AnalyticsMixin(_BaseRepo):
 
     def analytics_cost_breakdown(self, range_: str = "30d", project: str | None = None) -> dict[str, Any]:
         days = {"7d": 7, "30d": 30, "90d": 90, "all": 365}.get(range_, 30)
-        since = datetime.now(tz=UTC).timestamp() - days * 86400
-        params: list[Any] = [since]
+        since_dt = datetime.now(tz=UTC) - timedelta(days=days)
+        params: list[Any] = [since_dt]
         join = ""
         project_filter = ""
         if project:
@@ -540,11 +573,32 @@ class _AnalyticsMixin(_BaseRepo):
                    COALESCE(SUM(cache_creation_tokens), 0), COALESCE(SUM(cache_read_tokens), 0)
             FROM tf_messages m
             {join}
-            WHERE m.ts >= to_timestamp(?) AND m.model IS NOT NULL AND COALESCE(paused, FALSE) = FALSE {project_filter}
+            WHERE m.ts >= ?
+              AND m.model IS NOT NULL
+              AND COALESCE(paused, FALSE) = FALSE
+              AND NOT EXISTS (
+                  SELECT 1 FROM daily_aggregate da
+                  WHERE da.day = CAST(date_trunc('day', m.ts) AS DATE)
+              )
+              {project_filter}
             GROUP BY m.model
             """,
             tuple(params),
         )
+        agg_params: list[Any] = [since_dt.date()]
+        agg_project_filter = ""
+        if project:
+            agg_project_filter = "AND project_slug = ?"
+            agg_params.append(project)
+        agg_rows = self._q(
+            f"""
+            SELECT COALESCE(SUM(cost_usd), 0)
+            FROM daily_aggregate
+            WHERE day >= ? {agg_project_filter}
+            """,
+            tuple(agg_params),
+        )
+        archived_cost = float(agg_rows[0][0] or 0.0) if agg_rows else 0.0
         input_cost = output_cost = cw_cost = cr_cost = 0.0
         for model, inp, out, cw, cr in rows:
             pricing = self.pricing_for(model)  # type: ignore[attr-defined]
@@ -555,40 +609,63 @@ class _AnalyticsMixin(_BaseRepo):
             output_cost += (int(out) / 1e6) * p_out
             cw_cost += (int(cw) / 1e6) * p_cw
             cr_cost += (int(cr) / 1e6) * p_cr
-        total = input_cost + output_cost + cw_cost + cr_cost
+        total = input_cost + output_cost + cw_cost + cr_cost + archived_cost
+        parts = [
+            {"label": "Input", "value": round(input_cost, 2), "color": "var(--blue)"},
+            {"label": "Output", "value": round(output_cost, 2), "color": "var(--amber)"},
+            {"label": "Cache write", "value": round(cw_cost, 2), "color": "var(--violet)"},
+            {"label": "Cache read", "value": round(cr_cost, 2), "color": "var(--green)"},
+        ]
+        if archived_cost:
+            parts.append({"label": "Archived rollup", "value": round(archived_cost, 2), "color": "var(--muted)"})
         return {
             "range": range_,
             "total": round(total, 2),
-            "parts": [
-                {"label": "Input", "value": round(input_cost, 2), "color": "var(--blue)"},
-                {"label": "Output", "value": round(output_cost, 2), "color": "var(--amber)"},
-                {"label": "Cache write", "value": round(cw_cost, 2), "color": "var(--violet)"},
-                {"label": "Cache read", "value": round(cr_cost, 2), "color": "var(--green)"},
-            ],
+            "parts": parts,
         }
 
     def analytics_kpi(self, range_: str = "7d", project: str | None = None) -> dict[str, Any]:
         days = {"24h": 1, "7d": 7, "30d": 30, "90d": 90, "all": 365}.get(range_, 7)
-        since = datetime.now(tz=UTC).timestamp() - days * 86400
-        params: list[Any] = [since]
-        join = ""
-        project_filter = ""
+        since_dt = datetime.now(tz=UTC) - timedelta(days=days)
+        agg_params: list[Any] = [since_dt.date()]
+        raw_params: list[Any] = [since_dt]
+        agg_project_filter = ""
+        raw_join = ""
+        raw_project_filter = ""
         if project:
-            join = "JOIN sessions s ON s.session_id = m.session_id"
-            project_filter = "AND s.project_slug = ?"
-            params.append(project)
+            agg_project_filter = "AND project_slug = ?"
+            raw_join = "JOIN sessions s ON s.session_id = m.session_id"
+            raw_project_filter = "AND s.project_slug = ?"
+            agg_params.append(project)
+            raw_params.append(project)
         rows = self._q(
             f"""
-            SELECT COUNT(*), COALESCE(SUM(input_tokens + output_tokens), 0),
-                   COALESCE(SUM(cost_usd), 0)
-            FROM tf_messages m
-            {join}
-            WHERE m.ts >= to_timestamp(?) AND COALESCE(paused, FALSE) = FALSE {project_filter}
+            SELECT COALESCE(SUM(messages), 0), COALESCE(SUM(tokens), 0), COALESCE(SUM(cost), 0)
+            FROM (
+                SELECT COALESCE(SUM(messages), 0) AS messages,
+                       COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens,
+                       COALESCE(SUM(cost_usd), 0) AS cost
+                FROM daily_aggregate
+                WHERE day >= ? {agg_project_filter}
+                UNION ALL
+                SELECT COUNT(*) AS messages,
+                       COALESCE(SUM(m.input_tokens + m.output_tokens), 0) AS tokens,
+                       COALESCE(SUM(m.cost_usd), 0) AS cost
+                FROM tf_messages m
+                {raw_join}
+                WHERE m.ts >= ?
+                  AND COALESCE(m.paused, FALSE) = FALSE
+                  AND NOT EXISTS (
+                      SELECT 1 FROM daily_aggregate da
+                      WHERE da.day = CAST(date_trunc('day', m.ts) AS DATE)
+                  )
+                  {raw_project_filter}
+            )
             """,
-            tuple(params),
+            tuple(agg_params + raw_params),
         )
         msgs, toks, cost = rows[0] if rows else (0, 0, 0.0)
-        sess_params: list[Any] = [since]
+        sess_params: list[Any] = [since_dt]
         sess_filter = ""
         if project:
             sess_filter = "AND project_slug = ?"
@@ -596,7 +673,7 @@ class _AnalyticsMixin(_BaseRepo):
         sess_rows = self._q(
             "SELECT COUNT(*), COALESCE("
             "AVG(EXTRACT('epoch' FROM COALESCE(ended_at, now()) - started_at) / 60.0), 0) "
-            f"FROM sessions WHERE started_at >= to_timestamp(?) {sess_filter}",
+            f"FROM sessions WHERE started_at >= ? {sess_filter}",
             tuple(sess_params),
         )
         sessions, avg_min = sess_rows[0] if sess_rows else (0, 0.0)
@@ -609,6 +686,18 @@ class _AnalyticsMixin(_BaseRepo):
             "costPerSession": round(cost_per_session, 2),
             "sessions": int(sessions),
             "messages": int(msgs),
+        }
+
+    def analytics_overview(
+        self, range_: str = "7d", *, project: str | None = None, limit: int = 4
+    ) -> dict[str, Any]:
+        grid = self.analytics_heatmap(range_, project=project)
+        return {
+            "kpi": self.analytics_kpi(range_, project=project),
+            "daily": self.analytics_daily(range_, project=project),
+            "heatmap": {"range": range_, "grid": grid},
+            "cost": self.analytics_cost_breakdown(range_, project=project),
+            "topWastes": self.top_wastes(range_=range_, limit=limit, project=project),  # type: ignore[attr-defined]
         }
 
     # ---------- Config (budget / tweaks) ----------

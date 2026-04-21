@@ -3,9 +3,14 @@ import { TrendingUp, AlertTriangle } from "lucide-react";
 import { api } from "../../api/client";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { fmt } from "../../lib/fmt";
+import { queryKeys, queryStaleTime } from "../../lib/queryKeys";
 
 export function BudgetCard() {
-  const { data } = useQuery({ queryKey: ["kpi-budget"], queryFn: () => api.kpiBudget() });
+  const { data } = useQuery({
+    queryKey: queryKeys.kpiBudget,
+    queryFn: () => api.kpiBudget(),
+    staleTime: queryStaleTime.short,
+  });
 
   if (!data) {
     return (

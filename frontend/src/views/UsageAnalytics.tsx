@@ -10,6 +10,7 @@ import { Heatmap } from "../components/charts/Heatmap";
 import "../components/charts/chart.css";
 import "../views/live_monitor/LiveMonitor.css";
 import { fmt } from "../lib/fmt";
+import { queryKeys, queryStaleTime } from "../lib/queryKeys";
 
 const RANGES: { key: Range; label: string }[] = [
   { key: "24h", label: "24H" },
@@ -30,22 +31,31 @@ export function UsageAnalytics() {
   const [project, setProject] = useState<string>("");
   const projectRange = range === "30d" || range === "90d" || range === "all" ? "30d" : "7d";
 
-  const projects = useQuery({ queryKey: ["projects", projectRange], queryFn: () => api.projects(projectRange) });
+  const projects = useQuery({
+    queryKey: queryKeys.projects(projectRange),
+    queryFn: () => api.projects(projectRange),
+    staleTime: queryStaleTime.analytics,
+  });
   const projectParam = project || undefined;
-  const kpi = useQuery({ queryKey: ["analytics-kpi", range, project], queryFn: () => api.analyticsKpi(range, projectParam) });
-  const daily = useQuery({ queryKey: ["analytics-daily", range, project], queryFn: () => api.analyticsDaily(range, projectParam) });
-  const heat = useQuery({ queryKey: ["analytics-heatmap", range, project], queryFn: () => api.analyticsHeatmap(range, projectParam) });
-  const cost = useQuery({ queryKey: ["analytics-cost", range, project], queryFn: () => api.analyticsCostBreakdown(range, projectParam) });
-  const topWastes = useQuery({ queryKey: ["analytics-top-wastes", range, project], queryFn: () => api.analyticsTopWastes(range, 4, projectParam) });
+  const overview = useQuery({
+    queryKey: queryKeys.analyticsOverview(range, project),
+    queryFn: () => api.analyticsOverview(range, 4, projectParam),
+    staleTime: queryStaleTime.analytics,
+  });
+  const kpi = overview.data?.kpi;
+  const daily = overview.data?.daily;
+  const heat = overview.data?.heatmap;
+  const cost = overview.data?.cost;
+  const topWastes = overview.data?.topWastes ?? [];
 
-  const totalTokens = kpi.data?.totalTokens ?? 0;
-  const totalCost = kpi.data?.totalCost ?? 0;
-  const avgMin = kpi.data?.avgSessionMinutes ?? 0;
-  const perSession = kpi.data?.costPerSession ?? 0;
+  const totalTokens = kpi?.totalTokens ?? 0;
+  const totalCost = kpi?.totalCost ?? 0;
+  const avgMin = kpi?.avgSessionMinutes ?? 0;
+  const perSession = kpi?.costPerSession ?? 0;
 
   const everythingEmpty = useMemo(
-    () => totalTokens === 0 && (daily.data?.series ?? []).every((s) => s.data.every((d) => d === 0)),
-    [totalTokens, daily.data],
+    () => totalTokens === 0 && (daily?.series ?? []).every((s) => s.data.every((d) => d === 0)),
+    [totalTokens, daily],
   );
 
   return (
@@ -114,12 +124,12 @@ export function UsageAnalytics() {
             }
           />
           <CardBody>
-            {daily.data ? (
+            {daily ? (
               <AreaChart
                 width={820}
                 height={260}
-                labels={daily.data.labels}
-                series={daily.data.series.map((s) => ({ color: s.color, data: s.data }))}
+                labels={daily.labels}
+                series={daily.series.map((s) => ({ color: s.color, data: s.data }))}
               />
             ) : (
               <div style={{ height: 260, color: "var(--fg-3)", textAlign: "center", paddingTop: 110 }}>
@@ -136,8 +146,8 @@ export function UsageAnalytics() {
             sub={range.toUpperCase()}
           />
           <CardBody>
-            {cost.data ? (
-              <CostRing total={cost.data.total} parts={cost.data.parts} />
+            {cost ? (
+              <CostRing total={cost.total} parts={cost.parts} />
             ) : (
               <div style={{ color: "var(--fg-3)" }}>Loading…</div>
             )}
@@ -153,11 +163,11 @@ export function UsageAnalytics() {
             sub={range.toUpperCase()}
           />
           <CardBody>
-            {(topWastes.data ?? []).length === 0 ? (
+            {topWastes.length === 0 ? (
               <div className="view-placeholder">No waste patterns in this range.</div>
             ) : (
               <div className="vstack" style={{ gap: 10 }}>
-                {(topWastes.data ?? []).map((waste) => (
+                {topWastes.map((waste) => (
                   <div key={waste.id} className="settings-toggle-row">
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{waste.title}</div>
@@ -183,8 +193,8 @@ export function UsageAnalytics() {
             sub={`${range.toUpperCase()} × 24h`}
           />
           <CardBody>
-            {heat.data ? (
-              <Heatmap grid={heat.data.grid} color="var(--amber)" />
+            {heat ? (
+              <Heatmap grid={heat.grid} color="var(--amber)" />
             ) : (
               <div style={{ color: "var(--fg-3)" }}>Loading…</div>
             )}

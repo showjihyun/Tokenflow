@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
+import { queryStaleTime } from "../../lib/queryKeys";
 import { ApiKeyCard } from "./ApiKeyCard";
 import { BetterPromptCard } from "./BetterPromptCard";
 import { BudgetCard } from "./BudgetCard";
@@ -10,7 +11,11 @@ import { RoutingRulesCard } from "./RoutingRulesCard";
 import "./Settings.css";
 
 export function Settings() {
-  const { data } = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings() });
+  const { data } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => api.getSettings(),
+    staleTime: queryStaleTime.config,
+  });
 
   if (!data) {
     return (

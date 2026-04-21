@@ -168,12 +168,16 @@ class _CoachReplayMixin(_BaseRepo):
                    COALESCE(SUM(m.input_tokens + m.output_tokens), 0) AS toks,
                    COALESCE(SUM(m.cost_usd), 0) AS cost,
                    COUNT(m.message_id) AS msgs,
-                   (SELECT COUNT(*) FROM tf_waste_patterns w
-                    WHERE w.session_id = s.session_id) AS wastes
+                   COALESCE(w.wastes, 0) AS wastes
             FROM sessions s
             LEFT JOIN tf_messages m ON m.session_id = s.session_id AND COALESCE(m.paused, FALSE) = FALSE
+            LEFT JOIN (
+                SELECT session_id, COUNT(*) AS wastes
+                FROM tf_waste_patterns
+                GROUP BY session_id
+            ) w ON w.session_id = s.session_id
             {where}
-            GROUP BY s.session_id, s.project_slug, s.started_at, s.ended_at, s.model
+            GROUP BY s.session_id, s.project_slug, s.started_at, s.ended_at, s.model, w.wastes
             ORDER BY s.started_at DESC
             LIMIT ?
             """,

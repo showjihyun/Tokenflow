@@ -37,8 +37,7 @@ test("SPEC analytics project filter calls project-scoped APIs", async ({ page })
   await expect(page.getByRole("heading", { name: "Usage Analytics" })).toBeVisible();
   await page.getByLabel("Project filter").selectOption("alpha");
   await expect(page.getByText("Daily Usage")).toBeVisible();
-  await expect.poll(() => apiCalls.some((call) => call.includes("/api/analytics/daily") && call.includes("project=alpha"))).toBe(true);
-  await expect.poll(() => apiCalls.some((call) => call.includes("/api/analytics/top-wastes") && call.includes("project=alpha"))).toBe(true);
+  await expect.poll(() => apiCalls.some((call) => call.includes("/api/analytics/overview") && call.includes("project=alpha"))).toBe(true);
 });
 
 test("SPEC replay include-paused toggle reloads replay endpoint", async ({ page }) => {
@@ -278,6 +277,15 @@ function kpiSummary() {
 }
 
 function analyticsResponse(path: string) {
+  if (path === "/analytics/overview") {
+    return {
+      kpi: analyticsResponse("/analytics/kpi"),
+      daily: analyticsResponse("/analytics/daily"),
+      heatmap: analyticsResponse("/analytics/heatmap"),
+      cost: analyticsResponse("/analytics/cost-breakdown"),
+      topWastes: [waste()],
+    };
+  }
   if (path === "/analytics/kpi") return { range: "7d", totalTokens: 3200, totalCost: 0.42, avgSessionMinutes: 12, costPerSession: 0.21, sessions: 2, messages: 4 };
   if (path === "/analytics/daily") return { range: "7d", labels: ["Mon"], series: [{ key: "sonnet", color: "var(--amber)", data: [10] }, { key: "opus", color: "var(--violet)", data: [5] }, { key: "haiku", color: "var(--blue)", data: [1] }] };
   if (path === "/analytics/heatmap") return { range: "7d", grid: [[0, 1, 2]] };

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import { queryKeys } from "../lib/queryKeys";
+import { queryKeys, queryStaleTime } from "../lib/queryKeys";
 import { useTweaks } from "../lib/tweaksStore";
 import "./Topbar.css";
 
@@ -22,14 +22,17 @@ export function Topbar({ currentLabel, showRangePicker = false }: TopbarProps) {
     queryKey: ["system-health"],
     queryFn: () => api.health(),
     refetchInterval: 10_000,
+    staleTime: queryStaleTime.realtime,
   });
   const { data: notices = [] } = useQuery({
     queryKey: queryKeys.notificationEvents,
     queryFn: () => api.listNotificationEvents(10),
+    staleTime: queryStaleTime.short,
   });
   const { data: unread } = useQuery({
     queryKey: queryKeys.notificationUnreadCount,
     queryFn: () => api.unreadNotificationCount(),
+    staleTime: queryStaleTime.short,
   });
   const clearAll = useMutation({
     mutationFn: api.clearNotificationEvents,

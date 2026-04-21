@@ -1,0 +1,69 @@
+{
+  "date": "2026-04-21",
+  "window": "7d",
+  "metrics": {
+    "commits": 10,
+    "contributors": 1,
+    "prs_merged": 0,
+    "insertions": 28480,
+    "deletions": 6156,
+    "net_loc": 22324,
+    "test_loc": 2718,
+    "test_ratio": 0.095,
+    "active_days": 2,
+    "sessions": 5,
+    "deep_sessions": 0,
+    "medium_sessions": 1,
+    "micro_sessions": 4,
+    "avg_session_minutes": 11,
+    "total_active_minutes": 53,
+    "loc_per_session_hour": 32240,
+    "peak_hour": 7,
+    "ai_assisted_commits": 8
+  },
+  "commit_types": {
+    "conventional": 0,
+    "other": 10,
+    "note": "no commit uses conventional prefix (feat:/fix:/refactor:/test:/chore:/docs:) — all 10 use freeform subject lines"
+  },
+  "authors": {
+    "showjihyun": { "commits": 10, "insertions": 28480, "deletions": 6156, "test_ratio": 0.095, "top_area": "backend" }
+  },
+  "dirs_touched": {
+    "backend": 8,
+    "frontend": 6,
+    ".claude": 6,
+    "SPEC.md": 5
+  },
+  "commit_size_distribution": {
+    "small_under_100": 3,
+    "medium_100_500": 2,
+    "large_500_1500": 1,
+    "xl_1500_plus": 4
+  },
+  "test_health": {
+    "total_test_files": 32,
+    "test_files_changed": 11,
+    "regression_test_commits": 0
+  },
+  "backlog": {
+    "total_open": 3,
+    "p0_p1": 0,
+    "p2": 3,
+    "completed_this_period": 0,
+    "added_this_period": 1
+  },
+  "streak_days": 2,
+  "hotspot_files": [
+    [".claude/settings.local.json", 6],
+    ["frontend/src/views/coach_view/index.tsx", 5],
+    ["SPEC.md", 5]
+  ],
+  "ship_of_the_week": {
+    "hash": "e852f01",
+    "title": "Build Token Flow v1 through Phase A-E + bug-fix rounds",
+    "insertions": 15644,
+    "files": 140
+  },
+  "tweetable": "Week of Apr 14: v1 launch 🚀 10 commits / 28k LOC across 2 days · keyring removed · 6 SPEC↔code alignment commits · 84 pytest / 48 vitest green | Streak: 2d"
+}

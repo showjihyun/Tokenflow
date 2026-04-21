@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { api } from "../api/client";
 import { useSSE } from "../hooks/useSSE";
-import { queryKeys } from "../lib/queryKeys";
+import { queryKeys, queryStaleTime } from "../lib/queryKeys";
 import { useTickerStore } from "../lib/tickerStore";
 import type { TickerEvent } from "../types";
 
@@ -22,6 +22,7 @@ export function TickerSSEBridge() {
   const { data: notifications } = useQuery({
     queryKey: queryKeys.notifications,
     queryFn: () => api.listNotifications(),
+    staleTime: queryStaleTime.config,
   });
   const createNotice = useMutation({
     mutationFn: api.createNotificationEvent,

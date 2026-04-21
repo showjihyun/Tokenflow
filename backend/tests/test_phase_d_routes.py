@@ -107,6 +107,61 @@ def test_analytics_project_filter_and_efficiency_score() -> None:
         assert live["waste"]["byKind"][0]["kind"] == "context-bloat"
 
 
+def test_analytics_uses_daily_aggregate_after_retention() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from tokenflow.adapters.persistence.repository import Repository
+
+    with TestClient(create_app()) as c:
+        repo: Repository = c.app.state.repo  # type: ignore[attr-defined]
+        now = datetime.now(tz=UTC)
+        old = now - timedelta(days=220)
+
+        repo.upsert_session_started("archived_s", "archive-proj", "claude-opus-4-7", old)
+        repo.insert_message(
+            "archived_m",
+            "archived_s",
+            old,
+            "assistant",
+            "claude-opus-4-7",
+            300,
+            200,
+            0,
+            0,
+            1.5,
+            "archived",
+            False,
+        )
+        repo.upsert_session_started("recent_s", "archive-proj", "claude-sonnet-4-6", now)
+        repo.insert_message(
+            "recent_m",
+            "recent_s",
+            now,
+            "assistant",
+            "claude-sonnet-4-6",
+            10,
+            5,
+            0,
+            0,
+            0.1,
+            "recent",
+            False,
+        )
+
+        result = repo.apply_retention(days=180)
+        assert result["rolled_messages"] == 1
+        assert repo._q("SELECT COUNT(*) FROM tf_messages WHERE message_id = 'archived_m'")[0][0] == 0
+
+        kpi = c.get("/api/analytics/kpi?range=all&project=archive-proj").json()
+        assert kpi["totalTokens"] == 515
+        assert kpi["totalCost"] == 1.6
+        assert kpi["messages"] == 2
+
+        cost = c.get("/api/analytics/cost-breakdown?range=all&project=archive-proj").json()
+        assert cost["total"] == 1.5
+        assert any(part["label"] == "Archived rollup" and part["value"] == 1.5 for part in cost["parts"])
+
+
 def test_project_trend_returns_daily_tokens() -> None:
     from datetime import UTC, datetime, timedelta
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "../../api/client";
 import { Button } from "../../components/Button";
 import { Card, CardBody, CardHeader } from "../../components/Card";
+import { queryStaleTime } from "../../lib/queryKeys";
 
 export function DataCard() {
   const qc = useQueryClient();
@@ -13,11 +14,13 @@ export function DataCard() {
   const backups = useQuery({
     queryKey: ["system-backups"],
     queryFn: () => api.listBackups(),
+    staleTime: queryStaleTime.config,
   });
   const job = useQuery({
     queryKey: ["import-ccprophet", jobId],
     queryFn: () => api.importCcprophetStatus(jobId!),
     enabled: !!jobId,
+    staleTime: queryStaleTime.live,
     refetchInterval: (query) => {
       const state = query.state.data?.state;
       return state === "queued" || state === "running" ? 1000 : false;

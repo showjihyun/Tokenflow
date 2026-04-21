@@ -20,6 +20,16 @@ def kpi(
     return repo.analytics_kpi(range, project=project)
 
 
+@router.get("/analytics/overview")
+def overview(
+    range: Range = "7d",
+    project: str | None = None,
+    limit: int = Query(default=4, ge=1, le=50),
+    repo: Repository = Depends(get_repo),
+) -> dict[str, Any]:
+    return repo.analytics_overview(range, project=project, limit=limit)
+
+
 @router.get("/analytics/daily")
 def daily(
     range: Range = "30d",

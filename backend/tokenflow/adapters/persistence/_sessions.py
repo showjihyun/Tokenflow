@@ -3,11 +3,26 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypedDict
 
 import duckdb
 
 from tokenflow.adapters.persistence._base import _BaseRepo
+
+
+class MessageInsert(TypedDict):
+    message_id: str
+    session_id: str
+    ts: datetime
+    role: str
+    model: str | None
+    input_tokens: int
+    output_tokens: int
+    cache_creation_tokens: int
+    cache_read_tokens: int
+    cost_usd: float
+    content_preview: str | None
+    paused: bool
 
 
 class _SessionMixin(_BaseRepo):
@@ -159,6 +174,44 @@ class _SessionMixin(_BaseRepo):
             return True
         except duckdb.ConstraintException:
             return False
+
+    def insert_messages_batch(self, messages: list[MessageInsert]) -> set[str]:
+        """Insert many transcript messages while holding the repository lock once."""
+        inserted: set[str] = set()
+        if not messages:
+            return inserted
+        sql = """
+            INSERT INTO tf_messages (
+              message_id, session_id, ts, role, model,
+              input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens,
+              cost_usd, content_preview, paused
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+        with self._lock:
+            for message in messages:
+                try:
+                    self._conn.execute(
+                        sql,
+                        (
+                            message["message_id"],
+                            message["session_id"],
+                            message["ts"],
+                            message["role"],
+                            message["model"],
+                            message["input_tokens"],
+                            message["output_tokens"],
+                            message["cache_creation_tokens"],
+                            message["cache_read_tokens"],
+                            message["cost_usd"],
+                            message["content_preview"],
+                            message["paused"],
+                        ),
+                    )
+                    inserted.add(message["message_id"])
+                except duckdb.ConstraintException:
+                    continue
+        return inserted
 
     def update_session_totals_from_messages(self, session_id: str) -> None:
         self._exec(

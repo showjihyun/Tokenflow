@@ -61,6 +61,14 @@ export interface CostBreakdown {
   parts: CostPart[];
 }
 
+export interface AnalyticsOverview {
+  kpi: AnalyticsKPI;
+  daily: DailyResponse;
+  heatmap: HeatmapResponse;
+  cost: CostBreakdown;
+  topWastes: WastePattern[];
+}
+
 export type LLMModel = "claude-sonnet-4-6" | "claude-opus-4-7";
 
 export interface SettingsResponse {
@@ -351,6 +359,11 @@ export const api = {
     const params = analyticsParams(range, project);
     params.set("limit", String(limit));
     return apiFetch<WastePattern[]>(`/analytics/top-wastes?${params.toString()}`);
+  },
+  analyticsOverview: (range: Range = "7d", limit = 4, project?: string) => {
+    const params = analyticsParams(range, project);
+    params.set("limit", String(limit));
+    return apiFetch<AnalyticsOverview>(`/analytics/overview?${params.toString()}`);
   },
 
   // Settings

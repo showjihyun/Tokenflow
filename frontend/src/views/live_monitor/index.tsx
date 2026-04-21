@@ -5,6 +5,7 @@ import { api } from "../../api/client";
 import { Button } from "../../components/Button";
 import { ErrorState } from "../../components/ErrorState";
 import { errorVariantFrom } from "../../lib/errorMapping";
+import { queryKeys, queryStaleTime } from "../../lib/queryKeys";
 import "../../components/charts/chart.css";
 import "./LiveMonitor.css";
 
@@ -19,8 +20,9 @@ import { TokenFlowChart } from "./TokenFlowChart";
 export function LiveMonitor() {
   const [paused, setPaused] = useState(false);
   const { data: session, isError, error, refetch } = useQuery({
-    queryKey: ["session-current"],
+    queryKey: queryKeys.sessionCurrent,
     queryFn: () => api.currentSession(),
+    staleTime: queryStaleTime.live,
   });
   const pauseMutation = useMutation({
     mutationFn: (next: boolean) => api.pauseIngestion(next),

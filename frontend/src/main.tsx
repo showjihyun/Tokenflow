@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
+import { queryStaleTime } from "./lib/queryKeys";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/theme.css";
@@ -9,7 +10,7 @@ import "./styles/theme.css";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 10_000,
+      staleTime: queryStaleTime.realtime,
       refetchOnWindowFocus: false,
     },
   },

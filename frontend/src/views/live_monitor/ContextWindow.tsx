@@ -4,11 +4,13 @@ import { api } from "../../api/client";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Ring } from "../../components/charts/Ring";
 import { fmt } from "../../lib/fmt";
+import { queryKeys, queryStaleTime } from "../../lib/queryKeys";
 
 export function ContextWindow() {
   const { data } = useQuery({
-    queryKey: ["session-current"],
+    queryKey: queryKeys.sessionCurrent,
     queryFn: () => api.currentSession(),
+    staleTime: queryStaleTime.live,
     refetchInterval: 5_000,
   });
 

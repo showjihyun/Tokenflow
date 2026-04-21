@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from tokenflow.adapters.persistence._sessions import MessageInsert
 from tokenflow.adapters.persistence.repository import Repository
 from tokenflow.adapters.transcript.parser import compute_cost, parse_line
 from tokenflow.domain.waste import evaluate_opus_overuse
@@ -84,7 +85,9 @@ class TranscriptTailer:
             return
         processed = chunk[: last_nl + 1]
         new_offset = offset + len(processed)
-        new_rows = 0
+        pending: list[MessageInsert] = []
+        publish_events: dict[str, dict[str, object]] = {}
+        pricing_cache: dict[str, tuple[float, float, float, float] | None] = {}
         for raw_line in processed.decode("utf-8", errors="replace").splitlines():
             if not raw_line.strip():
                 continue
@@ -92,7 +95,12 @@ class TranscriptTailer:
             if not parsed:
                 continue
             paused = self.is_paused()
-            pricing = self.repo.pricing_for(parsed["model"] or "claude-sonnet-4-6") if parsed["model"] else None
+            pricing = None
+            if parsed["model"]:
+                model = parsed["model"] or "claude-sonnet-4-6"
+                if model not in pricing_cache:
+                    pricing_cache[model] = self.repo.pricing_for(model)
+                pricing = pricing_cache[model]
             cost = compute_cost(
                 pricing,
                 parsed["input_tokens"],
@@ -100,25 +108,22 @@ class TranscriptTailer:
                 parsed["cache_creation_tokens"],
                 parsed["cache_read_tokens"],
             )
-            inserted = self.repo.insert_message(
-                parsed["message_id"],
-                parsed["session_id"],
-                parsed["ts"],
-                parsed["role"],
-                parsed["model"],
-                parsed["input_tokens"],
-                parsed["output_tokens"],
-                parsed["cache_creation_tokens"],
-                parsed["cache_read_tokens"],
-                cost,
-                parsed["content_preview"],
-                paused,
-            )
-            if inserted:
-                new_rows += 1
-                if paused:
-                    continue
-                self.publish({
+            pending.append({
+                "message_id": parsed["message_id"],
+                "session_id": parsed["session_id"],
+                "ts": parsed["ts"],
+                "role": parsed["role"],
+                "model": parsed["model"],
+                "input_tokens": parsed["input_tokens"],
+                "output_tokens": parsed["output_tokens"],
+                "cache_creation_tokens": parsed["cache_creation_tokens"],
+                "cache_read_tokens": parsed["cache_read_tokens"],
+                "cost_usd": cost,
+                "content_preview": parsed["content_preview"],
+                "paused": paused,
+            })
+            if not paused:
+                publish_events[parsed["message_id"]] = {
                     "kind": "message",
                     "session_id": parsed["session_id"],
                     "role": parsed["role"],
@@ -127,9 +132,15 @@ class TranscriptTailer:
                     "tokens_out": parsed["output_tokens"],
                     "cost_usd": round(cost, 4),
                     "ts": parsed["ts"].isoformat(),
-                })
+                }
 
-        if new_rows:
+        inserted_ids = self.repo.insert_messages_batch(pending)
+        for message_id in inserted_ids:
+            event = publish_events.get(message_id)
+            if event:
+                self.publish(event)
+
+        if inserted_ids:
             self.repo.update_session_totals_from_messages(session_id)
             self._publish_usage_notifications(session_id)
         # Only write offset when it actually moved — prevents idle DB churn every poll.
