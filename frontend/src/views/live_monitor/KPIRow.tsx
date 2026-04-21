@@ -27,8 +27,12 @@ export function KPIRow() {
   }
 
   const efficiencyAttr = data.efficiency.attribution;
+  // FINDING-002: the old 4-in-1 ``penalty X · waste X / model X / ctx X``
+  // crowd-string wrapped awkwardly in the KPI card. Keep one single-line
+  // summary; the detailed breakdown lives in the existing kpi-detail-grid
+  // (shown on hover/focus via the KPI component's detail slot).
   const efficiencySub = efficiencyAttr
-    ? `penalty ${efficiencyAttr.penalty.total.toFixed(1)} · waste ${efficiencyAttr.penalty.waste.toFixed(1)} / model ${efficiencyAttr.penalty.opusMisuse.toFixed(1)} / ctx ${efficiencyAttr.penalty.contextBloat.toFixed(1)}`
+    ? `−${efficiencyAttr.penalty.total.toFixed(1)} pts total penalty`
     : undefined;
   const topWaste = data.waste.byKind?.[0];
   const wasteSub = topWaste
