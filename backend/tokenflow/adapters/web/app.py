@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,6 +18,7 @@ from tokenflow.adapters.hook.event_tailer import EventTailer
 from tokenflow.adapters.persistence import migrations, paths
 from tokenflow.adapters.persistence.repository import Repository
 from tokenflow.adapters.transcript.tailer import TranscriptTailer
+from tokenflow.adapters.web.blocking import run_blocking
 from tokenflow.adapters.web.pubsub import EventBus
 from tokenflow.adapters.web.routes import api_router
 
@@ -25,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    paths.ensure_dirs()
-    applied = migrations.run_migrations()
+    await run_blocking(paths.ensure_dirs)
+    applied = await run_blocking(migrations.run_migrations)
     if applied:
         logger.info("Applied migrations: %s", applied)
 
@@ -36,27 +38,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.bus = bus
     app.state.ingestion_paused = False
 
-    repo.apply_retention(days=180)
+    await run_blocking(repo.apply_retention, days=180)
 
     transcript_tailer = TranscriptTailer(repo, publish=bus.publish, is_paused=lambda: bool(app.state.ingestion_paused))
     event_tailer = EventTailer(repo, publish=bus.publish, is_paused=lambda: bool(app.state.ingestion_paused))
     app.state.transcript_tailer = transcript_tailer
     app.state.event_tailer = event_tailer
 
-    event_task = asyncio.create_task(event_tailer.run(), name="event-tailer")
-    transcript_task = asyncio.create_task(transcript_tailer.run(), name="transcript-tailer")
+    event_thread = threading.Thread(target=event_tailer.run, name="event-tailer", daemon=True)
+    transcript_thread = threading.Thread(target=transcript_tailer.run, name="transcript-tailer", daemon=True)
+    event_thread.start()
+    transcript_thread.start()
 
     try:
         yield
     finally:
         event_tailer.stop()
         transcript_tailer.stop()
-        for t in (event_task, transcript_task):
-            t.cancel()
-        for t in (event_task, transcript_task):
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await t
-        repo.close()
+        for t in (event_thread, transcript_thread):
+            with contextlib.suppress(Exception):
+                await asyncio.to_thread(t.join, 5.0)
+        await run_blocking(repo.close)
 
 
 def create_app(frontend_dist: Path | None = None) -> FastAPI:

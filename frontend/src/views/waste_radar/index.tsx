@@ -15,6 +15,8 @@ import { api, type WasteKind, type WastePattern, type WasteSeverity } from "../.
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Card, CardBody, CardHeader } from "../../components/Card";
+import { EmptyState } from "../../components/EmptyState";
+import { ErrorState } from "../../components/ErrorState";
 import { fmt } from "../../lib/fmt";
 import "./WasteRadar.css";
 
@@ -47,7 +49,7 @@ export function WasteRadar() {
     outcome: string;
     preview: { path: string; title: string; diff: string } | null;
   } | null>(null);
-  const { data: wastes, isLoading } = useQuery({
+  const { data: wastes, isLoading, isError, refetch } = useQuery({
     queryKey: ["wastes", "active"],
     queryFn: () => api.listWastes("active"),
     refetchInterval: 15_000,
@@ -119,6 +121,8 @@ export function WasteRadar() {
 
       {isLoading && <div className="view-placeholder">Loading waste patterns…</div>}
 
+      {isError && <ErrorState variant="generic" onRetry={() => refetch()} />}
+
       {appliedPreview && (
         <Card>
           <CardHeader
@@ -167,15 +171,12 @@ export function WasteRadar() {
         </Card>
       )}
 
-      {!isLoading && active.length === 0 && (
-        <Card>
-          <CardHeader title="All clean" icon={<Radar size={13} strokeWidth={1.6} />} />
-          <CardBody>
-            <div className="view-placeholder">
-              🎉 No active waste patterns. Start Claude Code or run "Scan now" to re-check.
-            </div>
-          </CardBody>
-        </Card>
+      {!isLoading && !isError && active.length === 0 && (
+        <EmptyState
+          icon={<Radar size={20} strokeWidth={1.6} />}
+          title="All clean"
+          description='No active waste patterns. Start Claude Code or run "Scan now" to re-check.'
+        />
       )}
 
       <div className="vstack" style={{ gap: 12 }}>

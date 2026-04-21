@@ -35,12 +35,12 @@ class NotificationCreate(BaseModel):
 
 
 @router.get("/settings/routing-rules")
-async def list_rules(repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
+def list_rules(repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
     return repo.list_routing_rules()
 
 
 @router.post("/settings/routing-rules")
-async def create_rule(payload: RoutingRulePayload, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def create_rule(payload: RoutingRulePayload, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     rule_id = uuid.uuid4().hex[:16]
     repo.upsert_routing_rule(
         rule_id=rule_id,
@@ -53,7 +53,7 @@ async def create_rule(payload: RoutingRulePayload, repo: Repository = Depends(ge
 
 
 @router.patch("/settings/routing-rules/{rule_id}")
-async def update_rule(
+def update_rule(
     rule_id: str, payload: RoutingRulePayload, repo: Repository = Depends(get_repo)
 ) -> dict[str, Any]:
     if not any(r["id"] == rule_id for r in repo.list_routing_rules()):
@@ -69,18 +69,18 @@ async def update_rule(
 
 
 @router.delete("/settings/routing-rules/{rule_id}")
-async def delete_rule(rule_id: str, repo: Repository = Depends(get_repo)) -> dict[str, bool]:
+def delete_rule(rule_id: str, repo: Repository = Depends(get_repo)) -> dict[str, bool]:
     repo.delete_routing_rule(rule_id)
     return {"ok": True}
 
 
 @router.get("/settings/notifications")
-async def list_notifs(repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
+def list_notifs(repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
     return repo.list_notification_prefs()
 
 
 @router.patch("/settings/notifications/{pref_key}")
-async def patch_notif(
+def patch_notif(
     pref_key: str, payload: NotifPatch, repo: Repository = Depends(get_repo)
 ) -> dict[str, Any]:
     repo.update_notification_pref(pref_key, enabled=payload.enabled, channel=payload.channel)
@@ -92,7 +92,7 @@ async def patch_notif(
 
 
 @router.get("/notifications")
-async def list_notification_events(
+def list_notification_events(
     limit: int = 10,
     repo: Repository = Depends(get_repo),
 ) -> list[dict[str, Any]]:
@@ -100,12 +100,12 @@ async def list_notification_events(
 
 
 @router.get("/notifications/unread-count")
-async def unread_notification_count(repo: Repository = Depends(get_repo)) -> dict[str, int]:
+def unread_notification_count(repo: Repository = Depends(get_repo)) -> dict[str, int]:
     return {"count": repo.unread_notification_count()}
 
 
 @router.post("/notifications")
-async def create_notification_event(
+def create_notification_event(
     payload: NotificationCreate,
     repo: Repository = Depends(get_repo),
 ) -> dict[str, Any]:
@@ -127,7 +127,7 @@ async def create_notification_event(
 
 
 @router.patch("/notifications/{notification_id}/read")
-async def mark_notification_read(
+def mark_notification_read(
     notification_id: str,
     repo: Repository = Depends(get_repo),
 ) -> dict[str, Any]:
@@ -138,12 +138,12 @@ async def mark_notification_read(
 
 
 @router.post("/notifications/read-all")
-async def mark_all_notification_events_read(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def mark_all_notification_events_read(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     updated = repo.mark_all_notifications_read(read_at=datetime.now(tz=UTC))
     return {"ok": True, "updated": updated}
 
 
 @router.delete("/notifications")
-async def clear_notification_events(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def clear_notification_events(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     deleted = repo.clear_notifications()
     return {"ok": True, "deleted": deleted}

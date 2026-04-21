@@ -10,9 +10,10 @@ from tokenflow.adapters.coach.client import (
     CoachClientUnavailableError,
     CoachRateLimitError,
     CoachUpstreamError,
-    chat_sonnet,
+    chat_sonnet_async,
 )
 from tokenflow.adapters.persistence.repository import Repository
+from tokenflow.adapters.web.blocking import run_blocking
 from tokenflow.adapters.web.deps import get_bus, get_repo
 from tokenflow.adapters.web.pubsub import EventBus
 from tokenflow.adapters.web.rate_limit import better_prompt_limiter
@@ -26,7 +27,7 @@ def _publish_api_error(bus: EventBus, *, source: str, status: str) -> None:
 
 
 @router.get("/sessions")
-async def list_sessions(
+def list_sessions(
     project: str | None = None,
     has_waste: bool = False,
     q: str | None = None,
@@ -37,7 +38,7 @@ async def list_sessions(
 
 
 @router.get("/sessions/{session_id}/replay")
-async def session_replay(
+def session_replay(
     session_id: str,
     include_paused: bool = False,
     repo: Repository = Depends(get_repo),
@@ -59,12 +60,12 @@ async def session_replay(
 
 
 @router.get("/sessions/{session_id}/export")
-async def export_session(
+def export_session(
     session_id: str,
     include_paused: bool = False,
     repo: Repository = Depends(get_repo),
 ) -> dict[str, Any]:
-    replay = await session_replay(session_id=session_id, include_paused=include_paused, repo=repo)
+    replay = session_replay(session_id=session_id, include_paused=include_paused, repo=repo)
     return {
         "schema": "tokenflow.export.v1",
         "session_id": session_id,
@@ -82,11 +83,11 @@ async def better_prompt(
     repo: Repository = Depends(get_repo),
     bus: EventBus = Depends(get_bus),
 ) -> dict[str, Any]:
-    cached = repo.get_better_prompt(session_id, idx, mode)
+    cached = await run_blocking(repo.get_better_prompt, session_id, idx, mode)
     if cached:
         return cached
 
-    events = repo.session_replay(session_id)
+    events = await run_blocking(repo.session_replay, session_id)
     if idx < 0 or idx >= len(events):
         raise HTTPException(404, "message index out of range")
     msg = events[idx]
@@ -104,8 +105,14 @@ async def better_prompt(
 
     if mode == "static":
         text, est = static_suggestion(waste_reason, file_path=None)
-        repo.cache_better_prompt(session_id=session_id, msg_index=idx, mode=mode,
-                                 suggested_text=text, est_save_tokens=est)
+        await run_blocking(
+            repo.cache_better_prompt,
+            session_id=session_id,
+            msg_index=idx,
+            mode=mode,
+            suggested_text=text,
+            est_save_tokens=est,
+        )
         return {"suggested_text": text, "est_save_tokens": est, "mode": "static", "cached": False}
 
     # LLM mode
@@ -116,9 +123,10 @@ async def better_prompt(
         model=msg["model"],
         waste_reason=waste_reason,
     )
-    chosen_model = str(repo.get_config().get("llm_model") or "") or None
+    config = await run_blocking(repo.get_config)
+    chosen_model = str(config.get("llm_model") or "") or None
     try:
-        resp = chat_sonnet(
+        resp = await chat_sonnet_async(
             system_prompt=LLM_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
             max_tokens=200,
@@ -140,6 +148,12 @@ async def better_prompt(
 
     text = resp["text"].strip()
     est = max(0, msg["tokens_in"] // 3)
-    repo.cache_better_prompt(session_id=session_id, msg_index=idx, mode=mode,
-                             suggested_text=text, est_save_tokens=est)
+    await run_blocking(
+        repo.cache_better_prompt,
+        session_id=session_id,
+        msg_index=idx,
+        mode=mode,
+        suggested_text=text,
+        est_save_tokens=est,
+    )
     return {"suggested_text": text, "est_save_tokens": est, "mode": "llm", "cached": False, "model": MODEL_SONNET_4_6}

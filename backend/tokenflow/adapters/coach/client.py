@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import logging
+from functools import partial
 from typing import Any
+
+import anyio
 
 from tokenflow.adapters.persistence import secret_store
 
@@ -112,3 +115,24 @@ def chat_sonnet(
         },
         "model": getattr(resp, "model", effective_model),
     }
+
+
+async def chat_sonnet_async(
+    system_prompt: str,
+    messages: list[dict[str, str]],
+    *,
+    max_tokens: int = 1024,
+    temperature: float = 0.3,
+    model: str | None = None,
+) -> dict[str, Any]:
+    """Async boundary for the sync Anthropic SDK call."""
+    return await anyio.to_thread.run_sync(
+        partial(
+            chat_sonnet,
+            system_prompt,
+            messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            model=model,
+        )
+    )

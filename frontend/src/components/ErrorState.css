@@ -1,0 +1,72 @@
+.error-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in oklch, var(--red) 35%, var(--border-default));
+  background: color-mix(in oklch, var(--red) 6%, var(--bg-2));
+  border-radius: 10px;
+  color: var(--fg-1);
+}
+
+.error-state.compact {
+  padding: 8px 12px;
+  gap: 10px;
+}
+
+.error-state-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--red);
+}
+
+.error-state-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.error-state-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--fg-0);
+}
+
+.error-state-hint {
+  font-size: 12.5px;
+  color: var(--fg-2);
+  line-height: 1.4;
+}
+
+.error-state-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--bg-3);
+  color: var(--fg-0);
+  border: 1px solid var(--border-default);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.error-state-cta:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.error-state-cta:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.error-state-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

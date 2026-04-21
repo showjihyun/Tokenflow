@@ -14,7 +14,7 @@ router = APIRouter(tags=["onboarding"])
 
 
 @router.get("/onboarding/status")
-async def status(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def status(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     hook = detect_hook()
     api_key = secret_store.status()
     # ccprophet lives under the user's home, regardless of where TOKENFLOW_HOME points.
@@ -32,7 +32,7 @@ async def status(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
 
 
 @router.post("/onboarding/install-hook")
-async def post_install_hook(dry_run: bool = False) -> dict[str, Any]:
+def post_install_hook(dry_run: bool = False) -> dict[str, Any]:
     try:
         return install_hook(dry_run=dry_run)
     except Exception as e:
@@ -40,6 +40,6 @@ async def post_install_hook(dry_run: bool = False) -> dict[str, Any]:
 
 
 @router.post("/onboarding/complete")
-async def complete(repo: Repository = Depends(get_repo)) -> dict[str, bool]:
+def complete(repo: Repository = Depends(get_repo)) -> dict[str, bool]:
     repo.mark_onboarded()
     return {"onboarded": True}

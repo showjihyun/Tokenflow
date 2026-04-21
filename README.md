@@ -13,6 +13,12 @@ Token Flow turns Claude Code from a black-box bill into an observable, testable,
 
 No SaaS account. No cloud database. No default external calls. Your usage data stays in `~/.tokenflow/events.duckdb`.
 
+## What Gets Better
+
+- Stop guessing where Claude Code spend goes: see live tokens, model mix, waste, and budget pressure in one place.
+- Cut repeat waste: detect bad patterns, preview fixes, and keep paused/debug transcript noise out of analytics.
+- Ask better before you spend: get query quality and estimated coach cost before sending the next prompt.
+
 ## Why It Exists
 
 Claude Code is powerful enough to burn money quietly. Token Flow makes that visible:

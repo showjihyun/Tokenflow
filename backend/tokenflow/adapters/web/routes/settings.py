@@ -66,12 +66,12 @@ def _serialize_config(cfg: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get("/settings")
-async def get_settings(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def get_settings(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     return _serialize_config(repo.get_config())
 
 
 @router.put("/settings/budget")
-async def put_budget(payload: BudgetPayload, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def put_budget(payload: BudgetPayload, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     repo.patch_config(
         monthly_budget_usd=payload.monthly_budget_usd,
         alert_thresholds_pct=json.dumps(payload.alert_thresholds_pct),
@@ -81,20 +81,20 @@ async def put_budget(payload: BudgetPayload, repo: Repository = Depends(get_repo
 
 
 @router.patch("/settings/tweaks")
-async def patch_tweaks(payload: TweaksPayload, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def patch_tweaks(payload: TweaksPayload, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     updates = {k: v for k, v in payload.model_dump().items() if v is not None}
     repo.patch_config(**updates)
     return _serialize_config(repo.get_config())
 
 
 @router.get("/settings/api-key/status")
-async def api_key_status() -> dict[str, Any]:
+def api_key_status() -> dict[str, Any]:
     """Report whether an API key is configured so the UI can surface it."""
     return secret_store.status()
 
 
 @router.post("/settings/api-key")
-async def set_api_key(payload: ApiKeyPayload) -> dict[str, Any]:
+def set_api_key(payload: ApiKeyPayload) -> dict[str, Any]:
     try:
         secret_store.set_api_key(payload.key)
     except ValueError as e:
@@ -103,6 +103,6 @@ async def set_api_key(payload: ApiKeyPayload) -> dict[str, Any]:
 
 
 @router.delete("/settings/api-key")
-async def delete_api_key() -> dict[str, bool]:
+def delete_api_key() -> dict[str, bool]:
     secret_store.delete_api_key()
     return {"configured": False}

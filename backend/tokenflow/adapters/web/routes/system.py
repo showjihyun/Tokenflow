@@ -59,7 +59,7 @@ def _hook_status(repo: Repository) -> dict[str, Any]:
 
 
 @router.get("/system/health")
-async def health(request: Request, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def health(request: Request, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     key = secret_store.status()
     hook = _hook_status(repo)
     return {
@@ -76,13 +76,13 @@ async def health(request: Request, repo: Repository = Depends(get_repo)) -> dict
 
 
 @router.post("/system/ingestion-pause")
-async def ingestion_pause(payload: IngestionPausePayload, request: Request) -> dict[str, bool]:
+def ingestion_pause(payload: IngestionPausePayload, request: Request) -> dict[str, bool]:
     request.app.state.ingestion_paused = payload.paused
     return {"paused": bool(request.app.state.ingestion_paused)}
 
 
 @router.get("/system/backups")
-async def backups() -> list[dict[str, Any]]:
+def backups() -> list[dict[str, Any]]:
     paths.backups_dir().mkdir(parents=True, exist_ok=True)
     out: list[dict[str, Any]] = []
     for p in sorted(paths.backups_dir().glob("*.duckdb"), key=lambda x: x.stat().st_mtime, reverse=True):
@@ -97,7 +97,7 @@ async def backups() -> list[dict[str, Any]]:
 
 
 @router.post("/system/vacuum")
-async def vacuum(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def vacuum(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     before = paths.db_path().stat().st_size if paths.db_path().exists() else 0
     backup = _backup_db("vacuum", repo)
     retention = repo.apply_retention(days=180)

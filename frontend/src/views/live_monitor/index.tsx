@@ -3,6 +3,8 @@ import { useState } from "react";
 import { FileText, Pause } from "lucide-react";
 import { api } from "../../api/client";
 import { Button } from "../../components/Button";
+import { ErrorState } from "../../components/ErrorState";
+import { errorVariantFrom } from "../../lib/errorMapping";
 import "../../components/charts/chart.css";
 import "./LiveMonitor.css";
 
@@ -16,7 +18,7 @@ import { TokenFlowChart } from "./TokenFlowChart";
 
 export function LiveMonitor() {
   const [paused, setPaused] = useState(false);
-  const { data: session } = useQuery({
+  const { data: session, isError, error, refetch } = useQuery({
     queryKey: ["session-current"],
     queryFn: () => api.currentSession(),
   });
@@ -63,6 +65,14 @@ export function LiveMonitor() {
         </div>
       </div>
 
+      {isError && (
+        <ErrorState
+          variant={errorVariantFrom(error)}
+          detail={error instanceof Error ? error.message : undefined}
+          onRetry={() => refetch()}
+        />
+      )}
+
       <KPIRow />
 
       <div className="row row-21">
@@ -82,3 +92,4 @@ export function LiveMonitor() {
     </div>
   );
 }
+

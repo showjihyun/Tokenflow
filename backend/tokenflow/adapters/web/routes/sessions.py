@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from tokenflow.adapters.persistence.repository import Repository
+from tokenflow.adapters.web.blocking import run_blocking
 from tokenflow.adapters.web.deps import get_bus, get_repo
 from tokenflow.adapters.web.pubsub import EventBus
 
@@ -31,7 +32,7 @@ _EMPTY_SESSION: dict[str, Any] = {
 
 
 @router.get("/sessions/current")
-async def get_current_session(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def get_current_session(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     session = repo.get_current_session()
     if session is None:
         return _EMPTY_SESSION
@@ -40,7 +41,7 @@ async def get_current_session(repo: Repository = Depends(get_repo)) -> dict[str,
 
 
 @router.get("/sessions/current/flow")
-async def get_current_session_flow(
+def get_current_session_flow(
     window: str = "60m",
     repo: Repository = Depends(get_repo),
 ) -> dict[str, Any]:
@@ -55,7 +56,7 @@ async def _flow_generator(
     bus: EventBus,
     last_event_id: int,
 ) -> AsyncIterator[str]:
-    yield f"event: flow\ndata: {json.dumps(repo.flow_60m())}\n\n"
+    yield f"event: flow\ndata: {json.dumps(await run_blocking(repo.flow_60m))}\n\n"
     q = await bus.subscribe(last_event_id=last_event_id)
     try:
         while True:
@@ -68,7 +69,7 @@ async def _flow_generator(
                 continue
             if payload.get("kind") != "message":
                 continue
-            yield f"id: {eid}\nevent: flow\ndata: {json.dumps(repo.flow_60m())}\n\n"
+            yield f"id: {eid}\nevent: flow\ndata: {json.dumps(await run_blocking(repo.flow_60m))}\n\n"
     finally:
         await bus.unsubscribe(q)
 

@@ -43,7 +43,7 @@ def _run_import(job_id: str, src_path: str, repo: Repository) -> None:
 
 
 @router.post("/import/ccprophet")
-async def import_ccprophet(
+def import_ccprophet(
     payload: ImportCcprophetPayload,
     background_tasks: BackgroundTasks,
     repo: Repository = Depends(get_repo),
@@ -71,7 +71,7 @@ async def import_ccprophet(
 
 
 @router.get("/import/ccprophet/status/{job_id}")
-async def import_ccprophet_status(job_id: str) -> dict[str, Any]:
+def import_ccprophet_status(job_id: str) -> dict[str, Any]:
     with _jobs_lock:
         job = _jobs.get(job_id)
         if job is None:

@@ -13,9 +13,10 @@ from tokenflow.adapters.coach.client import (
     CoachClientUnavailableError,
     CoachRateLimitError,
     CoachUpstreamError,
-    chat_sonnet,
+    chat_sonnet_async,
 )
 from tokenflow.adapters.persistence.repository import Repository
+from tokenflow.adapters.web.blocking import run_blocking
 from tokenflow.adapters.web.deps import get_bus, get_repo
 from tokenflow.adapters.web.pubsub import EventBus
 from tokenflow.adapters.web.rate_limit import coach_limiter, make_dependency
@@ -131,19 +132,19 @@ def _publish_api_error(bus: EventBus, *, source: str, status: str) -> None:
 
 
 @router.get("/coach/threads")
-async def list_threads(repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
+def list_threads(repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
     return repo.list_coach_threads()
 
 
 @router.post("/coach/threads")
-async def create_thread(body: CreateThreadBody, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def create_thread(body: CreateThreadBody, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     now = datetime.now(tz=UTC)
     thread_id = _mk_id("th", f"{now.isoformat()}-{body.title}")
     return repo.create_coach_thread(thread_id, title=body.title or "New thread")
 
 
 @router.get("/coach/threads/{thread_id}/messages")
-async def list_messages(thread_id: str, repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
+def list_messages(thread_id: str, repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
     return repo.list_coach_messages(thread_id)
 
 
@@ -159,18 +160,20 @@ async def send_message(
 ) -> dict[str, Any]:
     now = datetime.now(tz=UTC)
     user_id = _mk_id("msg", f"{thread_id}-{now.isoformat()}-user")
-    repo.insert_coach_message(
+    await run_blocking(
+        repo.insert_coach_message,
         message_id=user_id, thread_id=thread_id, role="me",
         content=body.content, ts=now,
     )
 
     # Build context + call LLM (respect the user-chosen model from tf_config).
-    snapshot = _build_context_snapshot(repo)
-    history = repo.list_coach_messages(thread_id)
+    snapshot = await run_blocking(_build_context_snapshot, repo)
+    history = await run_blocking(repo.list_coach_messages, thread_id)
     messages = [{"role": "assistant" if m["role"] == "ai" else "user", "content": m["content"]} for m in history]
-    chosen_model = str(repo.get_config().get("llm_model") or "") or None
+    config = await run_blocking(repo.get_config)
+    chosen_model = str(config.get("llm_model") or "") or None
     try:
-        resp = chat_sonnet(
+        resp = await chat_sonnet_async(
             system_prompt=COACH_SYSTEM_PROMPT + "\n\nLive data: " + str(snapshot),
             messages=messages,
             max_tokens=800,
@@ -191,7 +194,7 @@ async def send_message(
         raise HTTPException(status_code=502, detail=str(e)) from e
 
     usage = resp["usage"]
-    pricing = repo.pricing_for(resp.get("model") or MODEL_SONNET_4_6) or (3.0, 15.0, 3.75, 0.3)
+    pricing = await run_blocking(repo.pricing_for, resp.get("model") or MODEL_SONNET_4_6) or (3.0, 15.0, 3.75, 0.3)
     cost = (
         (usage["input_tokens"] / 1e6) * pricing[0]
         + (usage["output_tokens"] / 1e6) * pricing[1]
@@ -200,7 +203,8 @@ async def send_message(
     )
     ai_now = datetime.now(tz=UTC)
     ai_id = _mk_id("msg", f"{thread_id}-{ai_now.isoformat()}-ai")
-    repo.insert_coach_message(
+    await run_blocking(
+        repo.insert_coach_message,
         message_id=ai_id, thread_id=thread_id, role="ai",
         content=resp["text"], ts=ai_now,
         input_tokens=usage["input_tokens"], output_tokens=usage["output_tokens"],

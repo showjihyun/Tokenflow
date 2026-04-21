@@ -112,7 +112,13 @@
       "Bash(curl -s \"http://127.0.0.1:8765/api/sessions?limit=5\")",
       "Bash(mkdir -p \"C:/tmp/tf-scenario\")",
       "Bash(curl -s \"http://127.0.0.1:8765/api/kpi/summary?window=today\")",
-      "Bash(.venv/Scripts/python.exe -m pytest tests/test_phase_e_backend.py -v -k \"opus\")"
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_phase_e_backend.py -v -k \"opus\")",
+      "Bash(sed -n '107,130p' D:/workspace/tokenflow/backend/tokenflow/adapters/web/routes/rules_and_notifs.py)",
+      "Bash(sed -n '176,186p' D:/workspace/tokenflow/backend/tokenflow/adapters/transcript/tailer.py)",
+      "Bash(.venv/Scripts/python.exe -m pytest -q --timeout=30)",
+      "Bash(.venv/Scripts/python.exe -m pytest -q --ignore=tests/test_hook_and_tailer.py)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_routes.py::test_synthetic_data_populates_routes -v)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_hook_and_tailer.py -q)"
     ]
   }
 }

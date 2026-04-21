@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ErrorState } from "../../components/ErrorState";
+import { errorVariantFrom } from "../../lib/errorMapping";
 import { Plus, Send } from "lucide-react";
 import { api, type CoachMessage } from "../../api/client";
 import { Button, IconButton } from "../../components/Button";
@@ -75,6 +77,12 @@ export function AICoach() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["coach-messages", activeThread] });
       qc.invalidateQueries({ queryKey: ["coach-threads"] });
+    },
+    onError: (_err, variables) => {
+      // SPEC §10.4 "메시지 draft 보존": restore the content so the user can retry
+      // without retyping. onSend optimistically clears the textarea as soon as
+      // the request fires.
+      setDraft(variables.content);
     },
   });
 
@@ -187,10 +195,16 @@ export function AICoach() {
               </div>
             )}
             {sendMessage.isError && (
-              <div className="msg ai">
-                <div className="msg-bubble" style={{ color: "var(--red)" }}>
-                  Error: {(sendMessage.error as Error).message}
-                </div>
+              <div className="msg ai" style={{ alignItems: "stretch" }}>
+                <ErrorState
+                  compact
+                  variant={errorVariantFrom(sendMessage.error)}
+                  detail={sendMessage.error instanceof Error ? sendMessage.error.message : undefined}
+                  onRetry={() => {
+                    if (!draft.trim() || !activeThread) return;
+                    sendMessage.mutate({ threadId: activeThread, content: draft.trim() });
+                  }}
+                />
               </div>
             )}
             <div ref={bottomRef} />

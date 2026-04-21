@@ -11,7 +11,7 @@ router = APIRouter(tags=["kpi"])
 
 
 @router.get("/kpi/summary")
-async def kpi_summary(
+def kpi_summary(
     window: Literal["today", "7d", "30d"] = "today",
     repo: Repository = Depends(get_repo),
 ) -> dict[str, Any]:
@@ -19,10 +19,10 @@ async def kpi_summary(
 
 
 @router.get("/kpi/models")
-async def kpi_models(repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
+def kpi_models(repo: Repository = Depends(get_repo)) -> list[dict[str, Any]]:
     return repo.models_today()
 
 
 @router.get("/kpi/budget")
-async def kpi_budget(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def kpi_budget(repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     return repo.budget()

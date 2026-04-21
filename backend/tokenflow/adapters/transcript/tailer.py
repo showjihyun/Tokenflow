@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
 from tokenflow.adapters.persistence.repository import Repository
 from tokenflow.adapters.transcript.parser import compute_cost, parse_line
+from tokenflow.domain.waste import evaluate_opus_overuse
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class TranscriptTailer:
         self.publish = publish or (lambda _e: None)
         self.is_paused = is_paused or (lambda: False)
         self.poll_interval = poll_interval
-        self._stop = asyncio.Event()
+        self._stop = threading.Event()
         self._notified: set[str] = set()
         # path -> session_id
         self._sources: dict[str, str] = {}
@@ -47,7 +48,7 @@ class TranscriptTailer:
     def drop_source(self, path: str) -> None:
         self._sources.pop(path, None)
 
-    async def run(self) -> None:
+    def run(self) -> None:
         logger.info("TranscriptTailer: running")
         while not self._stop.is_set():
             self._refresh_sources_from_db()
@@ -58,10 +59,7 @@ class TranscriptTailer:
                     self.drop_source(path)
                 except Exception:
                     logger.exception("TranscriptTailer: error processing %s", path)
-            try:
-                await asyncio.wait_for(self._stop.wait(), timeout=self.poll_interval)
-            except TimeoutError:
-                continue
+            self._stop.wait(self.poll_interval)
 
     def _refresh_sources_from_db(self) -> None:
         # pick up transcripts discovered via hook events
@@ -155,13 +153,14 @@ class TranscriptTailer:
                     "context_window": context_window,
                 })
 
+        cfg = self.repo.get_config()
         budget = self.repo.budget()
         month = float(budget.get("month") or 0)
         spent = float(budget.get("spent") or 0)
+        month_key = datetime.now(tz=UTC).strftime("%Y-%m")
         if month > 0:
             pct = (spent / month) * 100
-            thresholds = _budget_thresholds(self.repo.get_config().get("alert_thresholds_pct"))
-            month_key = datetime.now(tz=UTC).strftime("%Y-%m")
+            thresholds = _budget_thresholds(cfg.get("alert_thresholds_pct"))
             for threshold in thresholds:
                 key = f"budget:{month_key}:{threshold}"
                 if pct >= threshold and key not in self._notified:
@@ -173,15 +172,39 @@ class TranscriptTailer:
                         "budget": round(month, 2),
                     })
 
+            # SPEC §11 #4: v1 = 알림만. hard_block=true 설정일 때 spent가 예산을
+            # 넘어가면 일반 threshold 와 구분되는 "exceeded" 이벤트를 한 번 더
+            # 발사해 UI/notification 쪽에서 red banner 로 강조할 수 있게 한다.
+            # 실제 요청 차단은 v2 proxy 작업.
+            if bool(cfg.get("hard_block")) and spent >= month:
+                key = f"budget-exceeded:{month_key}"
+                if key not in self._notified:
+                    self._notified.add(key)
+                    self.publish({
+                        "kind": "budget-exceeded",
+                        "spent": round(spent, 2),
+                        "budget": round(month, 2),
+                        "hard_block": True,
+                    })
+
+        # ``opusShare`` is today's Opus-cost fraction; we multiply by the month's
+        # ``spent`` as a best-effort proxy for month-wide share. A proper
+        # monthly aggregation is tracked in §12 (System notifications row).
         opus_share = float(budget.get("opusShare") or 0)
-        day_key = datetime.now(tz=UTC).strftime("%Y-%m-%d")
-        key = f"opus:{day_key}:25"
-        if opus_share >= 0.25 and key not in self._notified:
-            self._notified.add(key)
-            self.publish({
-                "kind": "opus-overuse",
-                "share": round(opus_share, 4),
-            })
+        verdict = evaluate_opus_overuse(
+            opus_cost_usd=opus_share * spent,
+            total_cost_usd=spent,
+        )
+        if verdict is not None:
+            _share, severity = verdict
+            key = f"opus:{month_key}:{severity}"
+            if key not in self._notified:
+                self._notified.add(key)
+                self.publish({
+                    "kind": "opus-overuse",
+                    "share": round(opus_share, 4),
+                    "severity": severity,
+                })
 
 
 def _budget_thresholds(raw: object) -> list[int]:

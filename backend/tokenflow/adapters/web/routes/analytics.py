@@ -12,7 +12,7 @@ Range = Literal["24h", "7d", "30d", "90d", "all"]
 
 
 @router.get("/analytics/kpi")
-async def kpi(
+def kpi(
     range: Range = "7d",
     project: str | None = None,
     repo: Repository = Depends(get_repo),
@@ -21,7 +21,7 @@ async def kpi(
 
 
 @router.get("/analytics/daily")
-async def daily(
+def daily(
     range: Range = "30d",
     project: str | None = None,
     repo: Repository = Depends(get_repo),
@@ -30,7 +30,7 @@ async def daily(
 
 
 @router.get("/analytics/heatmap")
-async def heatmap(
+def heatmap(
     range: Range = "7d",
     project: str | None = None,
     repo: Repository = Depends(get_repo),
@@ -40,7 +40,7 @@ async def heatmap(
 
 
 @router.get("/analytics/cost-breakdown")
-async def cost_breakdown(
+def cost_breakdown(
     range: Range = "30d",
     project: str | None = None,
     repo: Repository = Depends(get_repo),
@@ -49,7 +49,7 @@ async def cost_breakdown(
 
 
 @router.get("/analytics/top-wastes")
-async def top_wastes(
+def top_wastes(
     range: Range = "30d",
     limit: int = Query(default=4, ge=1, le=50),
     project: str | None = None,

@@ -52,12 +52,12 @@ def test_synthetic_data_populates_routes() -> None:
             "sess_test_1",
             project_slug="commerce-admin",
             model="claude-sonnet-4-6",
-            started_at=now - timedelta(minutes=30),
+            started_at=now - timedelta(minutes=5),
         )
         repo.insert_message(
             message_id="m1",
             session_id="sess_test_1",
-            ts=now - timedelta(minutes=20),
+            ts=now - timedelta(minutes=4),
             role="user",
             model=None,
             input_tokens=0,
@@ -70,7 +70,7 @@ def test_synthetic_data_populates_routes() -> None:
         repo.insert_message(
             message_id="m2",
             session_id="sess_test_1",
-            ts=now - timedelta(minutes=18),
+            ts=now - timedelta(minutes=3),
             role="assistant",
             model="claude-sonnet-4-6",
             input_tokens=500,

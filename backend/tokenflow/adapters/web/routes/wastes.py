@@ -77,7 +77,7 @@ def _session_cwd(repo: Repository, session_id: str | None) -> Path | None:
 
 
 @router.get("/wastes")
-async def list_wastes(
+def list_wastes(
     status: Literal["active", "dismissed"] = "active",
     repo: Repository = Depends(get_repo),
 ) -> list[dict[str, Any]]:
@@ -85,7 +85,7 @@ async def list_wastes(
 
 
 @router.post("/wastes/{waste_id}/dismiss")
-async def dismiss(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str, bool]:
+def dismiss(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str, bool]:
     ok = repo.mark_waste_dismissed(waste_id)
     if not ok:
         raise HTTPException(404)
@@ -93,7 +93,7 @@ async def dismiss(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[s
 
 
 @router.post("/wastes/{waste_id}/apply")
-async def apply(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def apply(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     waste = repo.get_waste(waste_id)
     if not waste:
         raise HTTPException(404)
@@ -130,7 +130,7 @@ async def apply(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str
 
 
 @router.post("/wastes/{waste_id}/apply-confirm")
-async def apply_confirm(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
+def apply_confirm(waste_id: str, repo: Repository = Depends(get_repo)) -> dict[str, Any]:
     waste = repo.get_waste(waste_id)
     if not waste:
         raise HTTPException(404)
@@ -156,7 +156,7 @@ async def apply_confirm(waste_id: str, repo: Repository = Depends(get_repo)) -> 
 
 
 @router.post("/wastes/scan")
-async def scan(
+def scan(
     session_id: str | None = None,
     repo: Repository = Depends(get_repo),
     bus: EventBus = Depends(get_bus),
@@ -168,7 +168,7 @@ async def scan(
 
 
 @router.post("/wastes/sweep")
-async def sweep(
+def sweep(
     repo: Repository = Depends(get_repo),
     bus: EventBus = Depends(get_bus),
 ) -> dict[str, Any]:

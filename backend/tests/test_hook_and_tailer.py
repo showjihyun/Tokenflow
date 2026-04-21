@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import json
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -122,13 +123,11 @@ def test_event_tailer_processes_ndjson(tmp_path: Path) -> None:
     events: list[dict[str, object]] = []
     tailer = EventTailer(repo, publish=events.append, poll_interval=0.05)
 
-    async def drive() -> None:
-        task = asyncio.create_task(tailer.run())
-        await asyncio.sleep(0.3)
-        tailer.stop()
-        await task
-
-    asyncio.run(drive())
+    task = threading.Thread(target=tailer.run, name="test-event-tailer")
+    task.start()
+    time.sleep(0.3)
+    tailer.stop()
+    task.join(timeout=2)
     assert repo.get_current_session() is not None
     assert any(e.get("hook_event_name") == "SessionStart" for e in events)
 
@@ -155,13 +154,11 @@ def test_transcript_tailer_reads_jsonl(tmp_path: Path) -> None:
     tailer = TranscriptTailer(repo, poll_interval=0.05)
     tailer.set_source(str(tpath), "s_tx")
 
-    async def drive() -> None:
-        task = asyncio.create_task(tailer.run())
-        await asyncio.sleep(0.3)
-        tailer.stop()
-        await task
-
-    asyncio.run(drive())
+    task = threading.Thread(target=tailer.run, name="test-transcript-tailer")
+    task.start()
+    time.sleep(0.3)
+    tailer.stop()
+    task.join(timeout=2)
     # Check a message landed and session totals updated
     session = repo.get_current_session()
     assert session is not None

@@ -11,7 +11,7 @@ router = APIRouter(tags=["projects"])
 
 
 @router.get("/projects")
-async def list_projects(
+def list_projects(
     range: str = "7d",
     repo: Repository = Depends(get_repo),
 ) -> list[dict[str, Any]]:
@@ -19,7 +19,7 @@ async def list_projects(
 
 
 @router.get("/projects/{name}/trend")
-async def project_trend(
+def project_trend(
     name: str,
     range: str = "7d",
     repo: Repository = Depends(get_repo),

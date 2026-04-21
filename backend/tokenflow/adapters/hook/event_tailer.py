@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 import functools
 import hashlib
 import json
 import logging
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -100,13 +100,13 @@ class EventTailer:
         self.is_paused = is_paused or (lambda: False)
         self.poll_interval = poll_interval
         self.inactivity_timeout = inactivity_timeout
-        self._stop = asyncio.Event()
+        self._stop = threading.Event()
         self._ndjson_path = paths.events_ndjson_path()
 
     def stop(self) -> None:
         self._stop.set()
 
-    async def run(self) -> None:
+    def run(self) -> None:
         self._ndjson_path.parent.mkdir(parents=True, exist_ok=True)
         self._ndjson_path.touch(exist_ok=True)
         offset = self.repo.get_hook_offset()
@@ -115,13 +115,10 @@ class EventTailer:
         while not self._stop.is_set():
             try:
                 self._end_inactive_sessions()
-                offset = await self._process_new(offset)
+                offset = self._process_new(offset)
             except Exception:
                 logger.exception("EventTailer: unexpected error")
-            try:
-                await asyncio.wait_for(self._stop.wait(), timeout=self.poll_interval)
-            except TimeoutError:
-                continue
+            self._stop.wait(self.poll_interval)
 
     def _end_inactive_sessions(self) -> None:
         cutoff = datetime.now(tz=UTC) - self.inactivity_timeout
@@ -134,7 +131,7 @@ class EventTailer:
                 "ended_count": ended,
             })
 
-    async def _process_new(self, offset: int) -> int:
+    def _process_new(self, offset: int) -> int:
         try:
             size = self._ndjson_path.stat().st_size
         except FileNotFoundError:
