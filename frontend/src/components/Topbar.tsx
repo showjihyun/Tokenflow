@@ -126,10 +126,21 @@ export function Topbar({ currentLabel, showRangePicker = false }: TopbarProps) {
       <div className="topbar-spacer" />
       {showRangePicker && (
         <div className="range-picker" role="tablist" aria-label="Time range">
-          <button>Live</button>
-          <button className="active">1H</button>
-          <button>Today</button>
-          <button>7D</button>
+          {/* Range picker is a visual placeholder for a future feature. We
+              still honor WAI-ARIA tab semantics so SR users don't see
+              generic buttons inside a tablist. */}
+          <button type="button" role="tab" aria-selected="false" tabIndex={-1}>
+            Live
+          </button>
+          <button type="button" role="tab" aria-selected="true" className="active" tabIndex={0}>
+            1H
+          </button>
+          <button type="button" role="tab" aria-selected="false" tabIndex={-1}>
+            Today
+          </button>
+          <button type="button" role="tab" aria-selected="false" tabIndex={-1}>
+            7D
+          </button>
         </div>
       )}
       <span className="connection-pill" data-status={status}>
