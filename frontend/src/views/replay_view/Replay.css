@@ -75,28 +75,61 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.replay-scrub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--fg-2);
+  letter-spacing: 0.02em;
+}
+
+.replay-scrub-hint {
+  color: var(--fg-3);
+  font-size: 10.5px;
+}
+
 .replay-scrub-bars {
   display: flex;
+  /* Anchor left so with few messages the bars cluster near the start rather
+     than stretching across the full width and reading as a flat purple block. */
+  justify-content: flex-start;
   align-items: flex-end;
-  gap: 2px;
-  height: 80px;
+  gap: 3px;
+  height: 56px;
 }
 
 .replay-scrub-bar {
-  flex: 1;
+  /* Fixed per-bar width — scrub semantics read as a row of bars, not a pair
+     of plates. Many bars still fit (overflow handled by parent scroll). */
+  flex: 0 0 auto;
+  width: 12px;
+  min-width: 12px;
   background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px 4px 0 0;
   position: relative;
   height: 100%;
   display: flex;
   align-items: flex-end;
   cursor: pointer;
   padding: 0;
+  transition: border-color 0.12s;
+}
+
+.replay-scrub-bar:hover {
+  border-color: var(--border-default);
+}
+
+.replay-scrub-bar.active {
+  border-color: var(--fg-1);
 }
 
 .replay-scrub-bar > .fill {
   width: 100%;
   border-radius: 3px 3px 0 0;
-  transition: opacity 0.12s;
+  transition: opacity 0.12s, height 0.12s;
 }
 
 .replay-timeline {

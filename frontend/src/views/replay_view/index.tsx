@@ -300,7 +300,11 @@ function ScrubBars({
   const max = Math.max(1, ...events.map((e) => e.tokens_in + e.tokens_out));
   return (
     <div className="replay-scrub">
-      <div className="replay-scrub-bars">
+      <div className="replay-scrub-header">
+        <span>Token volume per message</span>
+        <span className="replay-scrub-hint">Click a bar to jump</span>
+      </div>
+      <div className="replay-scrub-bars" role="tablist" aria-label="Message timeline">
         {events.map((e) => {
           const pct = ((e.tokens_in + e.tokens_out) / max) * 100;
           const kind = modelBadgeKind(e.model);
@@ -308,21 +312,26 @@ function ScrubBars({
             kind === "opus" ? "var(--violet)" :
             kind === "sonnet" ? "var(--amber)" :
             kind === "haiku" ? "var(--blue)" : "var(--fg-3)";
+          const isActive = activeIdx === e.idx;
           return (
             <button
               key={e.id}
               type="button"
-              className="replay-scrub-bar"
+              className={`replay-scrub-bar ${isActive ? "active" : ""}`}
               onClick={() => onPick(e.idx)}
               title={`${e.t} — ${fmt.k(e.tokens_in + e.tokens_out)} tokens`}
-              aria-label={`message ${e.idx + 1}`}
+              aria-label={`message ${e.idx + 1}, ${fmt.k(e.tokens_in + e.tokens_out)} tokens`}
+              aria-selected={isActive}
+              role="tab"
             >
               <div
                 className="fill"
                 style={{
-                  height: `${pct}%`,
+                  // Ensure even zero-token messages stay visible as a sliver so
+                  // the scrub bar reads as a row of bars, not an empty block.
+                  height: `${Math.max(pct, 4)}%`,
                   background: color,
-                  opacity: activeIdx === e.idx ? 1 : 0.55,
+                  opacity: isActive ? 1 : 0.55,
                 }}
               />
             </button>
