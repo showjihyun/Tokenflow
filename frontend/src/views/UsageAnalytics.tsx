@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Cpu, LineChart, TrendingUp } from "lucide-react";
 import { api, type Range } from "../api/client";
 import { Card, CardBody, CardHeader } from "../components/Card";
+import { EmptyState } from "../components/EmptyState";
 import { KPI } from "../components/KPI";
 import { AreaChart } from "../components/charts/AreaChart";
 import { CostRing } from "../components/charts/CostRing";
@@ -94,8 +95,12 @@ export function UsageAnalytics() {
       </div>
 
       {everythingEmpty && (
-        <div className="view-placeholder" style={{ marginBottom: 16 }}>
-          No usage data in this range. Start Claude Code or <code>tokenflow import --from-ccprophet &lt;db&gt;</code> to populate.
+        <div style={{ marginBottom: 16 }}>
+          <EmptyState
+            icon={<LineChart size={20} strokeWidth={1.6} />}
+            title="No usage data in this range"
+            description={<>Start Claude Code or run <code>tokenflow import --from-ccprophet &lt;db&gt;</code> to populate.</>}
+          />
         </div>
       )}
 
@@ -164,7 +169,7 @@ export function UsageAnalytics() {
           />
           <CardBody>
             {topWastes.length === 0 ? (
-              <div className="view-placeholder">No waste patterns in this range.</div>
+              <EmptyState compact title="No waste patterns in this range" />
             ) : (
               <div className="vstack" style={{ gap: 10 }}>
                 {topWastes.map((waste) => (

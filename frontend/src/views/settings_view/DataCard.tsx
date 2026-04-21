@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "../../api/client";
 import { Button } from "../../components/Button";
 import { Card, CardBody, CardHeader } from "../../components/Card";
+import { EmptyState } from "../../components/EmptyState";
 import { queryStaleTime } from "../../lib/queryKeys";
 
 export function DataCard() {
@@ -111,7 +112,7 @@ export function DataCard() {
                 </span>
               </div>
             ) : (
-              <div className="view-placeholder">No backups yet.</div>
+              <EmptyState compact title="No backups yet" description="Backups are created automatically before migrations and on every /system/vacuum call." />
             )}
           </div>
         </div>

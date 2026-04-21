@@ -5,6 +5,7 @@ import { api, type RoutingRule } from "../../api/client";
 import { Badge } from "../../components/Badge";
 import { Button, IconButton } from "../../components/Button";
 import { Card, CardBody, CardHeader } from "../../components/Card";
+import { EmptyState } from "../../components/EmptyState";
 import { Toggle } from "./Toggle";
 
 const MODEL_OPTIONS = [
@@ -70,9 +71,11 @@ export function RoutingRulesCard() {
             </div>
           ))}
           {(data ?? []).length === 0 && !isLoading && (
-            <div className="view-placeholder">
-              No rules yet. Waste Radar's "Apply fix" on wrong-model will create one automatically.
-            </div>
+            <EmptyState
+              compact
+              title="No routing rules yet"
+              description={<>Waste Radar's <em>Apply fix</em> on a wrong-model pattern creates one automatically.</>}
+            />
           )}
         </div>
 

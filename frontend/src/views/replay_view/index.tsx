@@ -4,6 +4,7 @@ import { FileText, Play, Search, Sparkles } from "lucide-react";
 import { api, type ReplayEvent, type SessionSummary } from "../../api/client";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
+import { EmptyState } from "../../components/EmptyState";
 import { useTweaks } from "../../lib/tweaksStore";
 import { fmt } from "../../lib/fmt";
 import { Toggle } from "../settings_view/Toggle";
@@ -116,8 +117,8 @@ export function SessionReplay() {
               />
             ))}
             {sessions.length === 0 && (
-              <div className="view-placeholder" style={{ margin: 12 }}>
-                No sessions match.
+              <div style={{ margin: 12 }}>
+                <EmptyState compact title="No sessions match" description="Clear filters or broaden the time range." />
               </div>
             )}
           </div>
@@ -125,8 +126,11 @@ export function SessionReplay() {
 
         <div className="replay-col">
           {!replay || replay.events.length === 0 ? (
-            <div className="view-placeholder" style={{ margin: 16 }}>
-              Pick a session (or wait for Claude Code to record one).
+            <div style={{ margin: 16 }}>
+              <EmptyState
+                title="No session selected"
+                description="Pick a session from the left panel — or start Claude Code and this fills in as tokens flow."
+              />
             </div>
           ) : (
             <>
@@ -241,8 +245,8 @@ export function SessionReplay() {
               </div>
             </>
           ) : (
-            <div className="view-placeholder" style={{ margin: 16 }}>
-              Select a message to see its detail.
+            <div style={{ margin: 16 }}>
+              <EmptyState compact title="No message selected" description="Click a row in the timeline to inspect tokens, model, and cost." />
             </div>
           )}
         </div>

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { api } from "../../api/client";
 import { Button } from "../../components/Button";
 import { Card, CardBody, CardHeader } from "../../components/Card";
+import { EmptyState } from "../../components/EmptyState";
 import { Toggle } from "./Toggle";
 
 const LABELS: Record<string, string> = {
@@ -63,7 +64,12 @@ export function NotificationsCard() {
       <CardBody>
         {isLoading && <div className="view-placeholder">Loading...</div>}
         {!support.supported && (
-          <div className="view-placeholder">System notifications are not supported in this browser.</div>
+          <EmptyState
+            compact
+            icon={<Bell size={16} strokeWidth={1.6} />}
+            title="Browser can't send system notifications"
+            description="In-app notifications still work — only the OS-level popup channel is unavailable."
+          />
         )}
         <div className="vstack" style={{ gap: 8 }}>
           {(data ?? []).map((pref) => (

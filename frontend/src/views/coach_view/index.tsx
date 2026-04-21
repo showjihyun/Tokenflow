@@ -199,8 +199,8 @@ export function AICoach() {
               </div>
             ))}
             {(threads.data ?? []).length === 0 && (
-              <div className="view-placeholder" style={{ margin: 12 }}>
-                No threads yet. Start a conversation.
+              <div style={{ margin: 12 }}>
+                <EmptyState compact title="No threads yet" description="Start a conversation below." />
               </div>
             )}
           </div>
