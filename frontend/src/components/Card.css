@@ -15,6 +15,9 @@
 }
 
 .card-title {
+  /* Rendered as <h2>/<h3> by Card.tsx — reset browser UA margins/size so the
+     visual weight matches the rest of the card chrome, not a hero headline. */
+  margin: 0;
   font-size: 12.5px;
   font-weight: 500;
   color: var(--fg-1);

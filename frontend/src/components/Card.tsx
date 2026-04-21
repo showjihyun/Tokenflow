@@ -14,14 +14,20 @@ interface CardHeaderProps {
   icon?: ReactNode;
   sub?: ReactNode;
   action?: ReactNode;
+  /**
+   * Semantic heading level used for SR TOC. Defaults to h2 — cards are
+   * page-level sections under the single <h1> page title. Pass "h3" for
+   * nested cards (e.g., cards inside a subsection).
+   */
+  as?: "h2" | "h3";
 }
-export function CardHeader({ title, icon, sub, action }: CardHeaderProps) {
+export function CardHeader({ title, icon, sub, action, as: HeadingTag = "h2" }: CardHeaderProps) {
   return (
     <div className="card-header">
-      <div className="card-title">
+      <HeadingTag className="card-title">
         {icon}
         {title}
-      </div>
+      </HeadingTag>
       {sub && <span className="card-sub mono">{sub}</span>}
       {action}
     </div>
