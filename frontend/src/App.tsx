@@ -6,6 +6,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar } from "./components/Sidebar";
 import { Topbar } from "./components/Topbar";
 import { TickerSSEBridge } from "./components/TickerSSEBridge";
+import { queryStaleTime } from "./lib/queryKeys";
 import { TweaksPanel } from "./components/TweaksPanel";
 import { useTweaks } from "./lib/tweaksStore";
 import { LiveMonitor } from "./views/LiveMonitor";
@@ -38,12 +39,24 @@ export default function App() {
   const { data: onboarding, refetch: refetchOnboarding } = useQuery({
     queryKey: ["onboarding-status"],
     queryFn: () => api.onboardingStatus(),
-    staleTime: 30_000,
+    staleTime: queryStaleTime.short,
   });
 
   useEffect(() => {
     localStorage.setItem("tf_view", view);
   }, [view]);
+
+  // Listen for in-app "navigate to X" events so views can link to other views
+  // without threading setView through multiple components. Consumers dispatch:
+  //   window.dispatchEvent(new CustomEvent("tf:navigate", { detail: "settings" }))
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const custom = e as CustomEvent<ViewKey>;
+      if (custom.detail) setView(custom.detail);
+    };
+    window.addEventListener("tf:navigate", handler);
+    return () => window.removeEventListener("tf:navigate", handler);
+  }, []);
 
   const views: Record<ViewKey, ReactElement> = {
     live: <LiveMonitor />,

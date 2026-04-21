@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
 import { errorVariantFrom } from "../../lib/errorMapping";
 import { Plus, Send } from "lucide-react";
@@ -7,6 +8,7 @@ import { api, type CoachMessage } from "../../api/client";
 import { Button, IconButton } from "../../components/Button";
 import { fmt } from "../../lib/fmt";
 import { renderMarkdown } from "../../lib/markdown";
+import { queryKeys, queryStaleTime } from "../../lib/queryKeys";
 import "./Coach.css";
 
 export function AICoach() {
@@ -16,7 +18,11 @@ export function AICoach() {
   const [qualityDraft, setQualityDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const keyStatus = useQuery({ queryKey: ["api-key-status"], queryFn: () => api.apiKeyStatus() });
+  const keyStatus = useQuery({
+    queryKey: queryKeys.apiKeyStatus,
+    queryFn: () => api.apiKeyStatus(),
+    staleTime: queryStaleTime.short,
+  });
   const threads = useQuery({
     queryKey: ["coach-threads"],
     queryFn: () => api.listCoachThreads(),
@@ -29,11 +35,28 @@ export function AICoach() {
   const suggestions = useQuery({
     queryKey: ["coach-suggestions"],
     queryFn: () => api.coachSuggestions(),
+    staleTime: queryStaleTime.config,
   });
-  const session = useQuery({ queryKey: ["session-current"], queryFn: () => api.currentSession() });
-  const budget = useQuery({ queryKey: ["kpi-budget"], queryFn: () => api.kpiBudget() });
-  const wastes = useQuery({ queryKey: ["wastes", "active"], queryFn: () => api.listWastes("active") });
-  const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.getSettings() });
+  const session = useQuery({
+    queryKey: queryKeys.sessionCurrent,
+    queryFn: () => api.currentSession(),
+    staleTime: queryStaleTime.live,
+  });
+  const budget = useQuery({
+    queryKey: queryKeys.kpiBudget,
+    queryFn: () => api.kpiBudget(),
+    staleTime: queryStaleTime.short,
+  });
+  const wastes = useQuery({
+    queryKey: ["wastes", "active"],
+    queryFn: () => api.listWastes("active"),
+    staleTime: queryStaleTime.short,
+  });
+  const settings = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => api.getSettings(),
+    staleTime: queryStaleTime.config,
+  });
   const quality = useQuery({
     queryKey: ["coach-query-quality", qualityDraft, session.data?.project],
     queryFn: () =>
@@ -42,7 +65,7 @@ export function AICoach() {
         model: session.data?.model,
       }),
     enabled: qualityDraft.length >= 6,
-    staleTime: 5_000,
+    staleTime: queryStaleTime.live,
   });
 
   useEffect(() => {
@@ -109,9 +132,21 @@ export function AICoach() {
             <p className="page-sub">API 키 등록 필요</p>
           </div>
         </div>
-        <div className="view-placeholder">
-          Add your Claude API key in Settings to enable AI Coach.
-        </div>
+        <EmptyState
+          title="Claude API key required"
+          description="AI Coach needs your Anthropic API key to call Claude. Add it once in Settings and it's stored locally at ~/.tokenflow/secret.json."
+          action={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent("tf:navigate", { detail: "settings" }))
+              }
+            >
+              Go to Settings
+            </Button>
+          }
+        />
       </div>
     );
   }
