@@ -20,9 +20,13 @@
   --fg-3: oklch(0.48 0.012 260);
 
   /* Accents — shared L=0.76 C=0.15, hue varies. Dark=0.56, wash=0.30 */
-  --amber:   oklch(0.76 0.15 62);
-  --amber-d: oklch(0.58 0.15 62);
-  --amber-w: oklch(0.30 0.08 62);
+  --amber:       oklch(0.76 0.15 62);
+  --amber-d:     oklch(0.58 0.15 62);
+  --amber-w:     oklch(0.30 0.08 62);
+  /* Derived: text on amber surface + hover lift. Kept here so primary
+     button theming stays tokenized instead of inline oklch() literals. */
+  --amber-on:    oklch(0.18 0.02 62);
+  --amber-hover: oklch(0.82 0.15 62);
   --green:   oklch(0.76 0.15 158);
   --green-d: oklch(0.58 0.15 158);
   --green-w: oklch(0.30 0.08 158);

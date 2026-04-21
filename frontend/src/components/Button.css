@@ -22,11 +22,11 @@
 .btn.primary {
   background: var(--amber);
   border-color: var(--amber);
-  color: oklch(0.18 0.02 62);
+  color: var(--amber-on);
 }
 
 .btn.primary:hover {
-  background: oklch(0.82 0.15 62);
+  background: var(--amber-hover);
 }
 
 .btn.ghost {
