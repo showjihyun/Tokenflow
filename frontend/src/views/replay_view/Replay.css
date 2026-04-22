@@ -1,7 +1,7 @@
 .replay-wrap {
   display: grid;
   grid-template-columns: 240px 1fr 340px;
-  gap: 12px;
+  gap: var(--s-3);
   height: calc(100vh - 48px - 48px - 64px);
 }
 
@@ -25,7 +25,7 @@
 }
 
 .replay-col-head {
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   gap: 6px;
@@ -38,7 +38,7 @@
 }
 
 .replay-session-row {
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: background 0.12s;
@@ -66,12 +66,12 @@
   color: var(--fg-3);
   font-family: var(--font-mono);
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
 }
 
 .replay-scrub {
-  padding: 12px 14px;
+  padding: var(--s-3) 14px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -79,7 +79,7 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 8px;
+  margin-bottom: var(--s-2);
   font-size: 11px;
   color: var(--fg-2);
   letter-spacing: 0.02em;
@@ -146,8 +146,8 @@
 .replay-row {
   display: grid;
   grid-template-columns: 72px 1fr 80px 80px;
-  gap: 12px;
-  padding: 8px 14px;
+  gap: var(--s-3);
+  padding: var(--s-2) 14px;
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: background 0.12s;
@@ -161,7 +161,7 @@
 .replay-row.active {
   background: var(--bg-2);
   border-left: 2px solid var(--amber);
-  padding-left: 12px;
+  padding-left: var(--s-3);
 }
 
 .replay-row .t {
@@ -193,7 +193,7 @@
 }
 
 .replay-detail-section {
-  padding: 12px 14px;
+  padding: var(--s-3) 14px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -206,7 +206,7 @@
 }
 
 .replay-detail-box {
-  padding: 8px 10px;
+  padding: var(--s-2) 10px;
   background: var(--bg-0);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;

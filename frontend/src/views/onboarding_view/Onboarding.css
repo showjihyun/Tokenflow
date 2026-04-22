@@ -8,7 +8,7 @@
   align-items: center;
   justify-content: center;
   overflow-y: auto;
-  padding: 40px 20px;
+  padding: var(--s-10) var(--s-5);
 }
 
 .onboarding-card {
@@ -22,15 +22,15 @@
 }
 
 .onboarding-header {
-  padding: 28px 28px 16px;
+  padding: 28px 28px var(--s-4);
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .onboarding-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
 }
 
 .onboarding-brand .mark {
@@ -50,8 +50,8 @@
 
 .onboarding-stepper {
   display: flex;
-  gap: 8px;
-  margin-top: 4px;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
 }
 
 .onboarding-stepper .dot {
@@ -70,33 +70,33 @@
 }
 
 .onboarding-body {
-  padding: 24px 28px;
+  padding: var(--s-6) 28px;
   min-height: 220px;
 }
 
 .onboarding-step-title {
   font-size: 16px;
   font-weight: 600;
-  margin: 0 0 8px;
+  margin: 0 0 var(--s-2);
 }
 
 .onboarding-step-sub {
   color: var(--fg-2);
   font-size: 13px;
   line-height: 1.55;
-  margin: 0 0 16px;
+  margin: 0 0 var(--s-4);
 }
 
 .onboarding-status-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: var(--s-3) 14px;
   background: var(--bg-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
   font-size: 13px;
-  margin-bottom: 8px;
+  margin-bottom: var(--s-2);
 }
 
 .onboarding-status-row[data-tone="ok"] {
@@ -108,7 +108,7 @@
 }
 
 .onboarding-footer {
-  padding: 16px 28px;
+  padding: var(--s-4) 28px;
   border-top: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
@@ -116,5 +116,5 @@
 }
 
 .onboarding-input {
-  margin-top: 8px;
+  margin-top: var(--s-2);
 }
