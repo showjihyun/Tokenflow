@@ -1,27 +1,22 @@
 import { Monitor, LineChart, Radar, MessageSquare, Waypoints, Settings as SettingsIcon, HelpCircle } from "lucide-react";
-import type { ViewKey } from "../App";
+import { NavLink } from "react-router-dom";
 import "./Sidebar.css";
 
 interface NavItem {
-  key: ViewKey;
+  to: string;
   label: string;
   Icon: typeof Monitor;
 }
 
 const WORKSPACE: NavItem[] = [
-  { key: "live", label: "Live Monitor", Icon: Monitor },
-  { key: "analytics", label: "Analytics", Icon: LineChart },
-  { key: "waste", label: "Waste Radar", Icon: Radar },
-  { key: "coach", label: "AI Coach", Icon: MessageSquare },
-  { key: "replay", label: "Session Replay", Icon: Waypoints },
+  { to: "/live", label: "Live Monitor", Icon: Monitor },
+  { to: "/analytics", label: "Analytics", Icon: LineChart },
+  { to: "/waste", label: "Waste Radar", Icon: Radar },
+  { to: "/coach", label: "AI Coach", Icon: MessageSquare },
+  { to: "/replay", label: "Session Replay", Icon: Waypoints },
 ];
 
-interface SidebarProps {
-  active: ViewKey;
-  onSelect: (key: ViewKey) => void;
-}
-
-export function Sidebar({ active, onSelect }: SidebarProps) {
+export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -33,27 +28,25 @@ export function Sidebar({ active, onSelect }: SidebarProps) {
 
       <nav className="nav" role="navigation">
         <div className="nav-group-label">Workspace</div>
-        {WORKSPACE.map(({ key, label, Icon }) => (
-          <button
-            key={key}
-            className={`nav-item ${active === key ? "active" : ""}`}
-            onClick={() => onSelect(key)}
-            aria-current={active === key ? "page" : undefined}
+        {WORKSPACE.map(({ to, label, Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
           >
             <Icon size={15} strokeWidth={1.6} />
             <span>{label}</span>
-          </button>
+          </NavLink>
         ))}
 
         <div className="nav-group-label">Account</div>
-        <button
-          className={`nav-item ${active === "settings" ? "active" : ""}`}
-          onClick={() => onSelect("settings")}
-          aria-current={active === "settings" ? "page" : undefined}
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
         >
           <SettingsIcon size={15} strokeWidth={1.6} />
           <span>Settings</span>
-        </button>
+        </NavLink>
         <a
           className="nav-item"
           href="https://github.com/showjihyun/Tokenflow#readme"

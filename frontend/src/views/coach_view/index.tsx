@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
 import { errorVariantFrom } from "../../lib/errorMapping";
@@ -13,6 +14,7 @@ import "./Coach.css";
 
 export function AICoach() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [qualityDraft, setQualityDraft] = useState("");
@@ -139,9 +141,7 @@ export function AICoach() {
             <Button
               variant="primary"
               size="sm"
-              onClick={() =>
-                window.dispatchEvent(new CustomEvent("tf:navigate", { detail: "settings" }))
-              }
+              onClick={() => navigate("/settings")}
             >
               Go to Settings
             </Button>
