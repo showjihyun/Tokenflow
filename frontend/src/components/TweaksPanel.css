@@ -21,7 +21,7 @@
 }
 
 .tweaks-head {
-  padding: 12px 14px;
+  padding: var(--s-3) 14px;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
@@ -37,11 +37,11 @@
 }
 
 .tweaks-body {
-  padding: 12px 14px;
+  padding: var(--s-3) 14px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--s-4);
 }
 
 .tweak-group {
@@ -59,14 +59,14 @@
 
 .tweak-opts {
   display: flex;
-  gap: 4px;
+  gap: var(--s-1);
   flex-wrap: wrap;
 }
 
 .tweak-opts button {
   flex: 1;
   min-width: 0;
-  padding: 5px 8px;
+  padding: 5px var(--s-2);
   background: var(--bg-2);
   border: 1px solid var(--border-subtle);
   border-radius: 5px;
@@ -89,5 +89,5 @@
   font-size: 10.5px;
   color: var(--fg-3);
   text-align: center;
-  padding: 4px 0;
+  padding: var(--s-1) 0;
 }

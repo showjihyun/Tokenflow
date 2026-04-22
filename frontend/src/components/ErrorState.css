@@ -1,8 +1,8 @@
 .error-state {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: var(--s-3);
+  padding: 14px var(--s-4);
   border: 1px solid color-mix(in oklch, var(--red) 35%, var(--border-default));
   background: color-mix(in oklch, var(--red) 6%, var(--bg-2));
   border-radius: 10px;
@@ -10,7 +10,7 @@
 }
 
 .error-state.compact {
-  padding: 8px 12px;
+  padding: var(--s-2) var(--s-3);
   gap: 10px;
 }
 
@@ -47,7 +47,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 6px var(--s-3);
   border-radius: 6px;
   background: var(--bg-3);
   color: var(--fg-0);

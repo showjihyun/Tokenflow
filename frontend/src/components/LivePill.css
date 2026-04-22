@@ -1,8 +1,8 @@
 .live-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 10px 4px 8px;
+  gap: var(--s-2);
+  padding: var(--s-1) 10px var(--s-1) var(--s-2);
   border-radius: 99px;
   font-size: 11.5px;
   font-family: var(--font-mono);

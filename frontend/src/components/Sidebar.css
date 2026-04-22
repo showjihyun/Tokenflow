@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 14px var(--s-4);
   border-bottom: 1px solid var(--border-subtle);
   height: 48px;
 }
@@ -37,7 +37,7 @@
 }
 
 .nav {
-  padding: 8px;
+  padding: var(--s-2);
   flex: 1;
   overflow-y: auto;
   min-height: 0;
@@ -47,7 +47,7 @@
 }
 
 .nav-group-label {
-  padding: 12px 10px 6px;
+  padding: var(--s-3) 10px 6px;
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -81,7 +81,7 @@
 
 .sidebar-footer {
   border-top: 1px solid var(--border-subtle);
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
 }
 
 .budget-mini {

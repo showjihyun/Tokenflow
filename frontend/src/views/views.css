@@ -1,5 +1,5 @@
 .view-placeholder {
-  padding: 24px;
+  padding: var(--s-6);
   border: 1px dashed var(--border-default);
   border-radius: var(--r-md);
   background: var(--bg-1);

@@ -1,8 +1,8 @@
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
 }
 
 @media (max-width: 1279px) {
@@ -12,7 +12,7 @@
 }
 
 .kpi {
-  padding: 14px 16px;
+  padding: 14px var(--s-4);
   background: var(--bg-1);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
@@ -21,10 +21,10 @@
 }
 
 .app[data-density="compact"] .kpi {
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
 }
 .app[data-density="roomy"] .kpi {
-  padding: 18px 20px;
+  padding: 18px var(--s-5);
 }
 
 .kpi-accent-bar {
@@ -71,7 +71,7 @@
   font-family: var(--font-mono);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-1);
   flex-wrap: wrap;
   padding-right: 86px;
   line-height: 1.35;
