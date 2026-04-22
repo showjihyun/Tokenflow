@@ -29,9 +29,19 @@ export default defineConfig({
       },
     },
     coverage: {
+      provider: "v8",
       reporter: ["text", "html"],
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/main.tsx", "src/test/**", "src/**/*.css"],
+      // Ratchet thresholds — raise as we add coverage. The gate's job today
+      // is preventing regression below the current baseline; incremental
+      // PRs should bump these numbers as they land new tests.
+      thresholds: {
+        lines: 25,
+        functions: 20,
+        branches: 20,
+        statements: 25,
+      },
     },
   },
 });

@@ -46,8 +46,8 @@ jobs:
       - name: Mypy --strict
         run: uv run mypy tokenflow tests
 
-      - name: Pytest
-        run: uv run pytest -q --durations=10
+      - name: Pytest (with coverage gate)
+        run: uv run pytest -q --durations=10 --cov --cov-fail-under=75
 
   frontend:
     name: Frontend (node ${{ matrix.node }})
@@ -77,8 +77,8 @@ jobs:
       - name: ESLint
         run: npm run lint
 
-      - name: Vitest
-        run: npm test
+      - name: Vitest (with coverage gate)
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build

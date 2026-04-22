@@ -35,7 +35,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-1);
   min-width: 0;
 }
 
@@ -56,7 +56,7 @@
   font-size: 12px;
   color: var(--fg-2);
   line-height: 1.55;
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
   background: var(--bg-2);
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
@@ -135,14 +135,14 @@
 
 .lm-budget-alert {
   margin-top: 14px;
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
   background: var(--amber-w);
   border: 1px solid color-mix(in oklch, var(--amber) 30%, transparent);
   border-radius: 8px;
   font-size: 12px;
   color: var(--amber);
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .lm-budget-alert .body {
@@ -151,14 +151,14 @@
 
 /* Activity ticker */
 .lm-ticker-empty {
-  padding: 20px;
+  padding: var(--s-5);
   color: var(--fg-3);
   font-size: 12px;
   text-align: center;
 }
 
 .lm-ticker-row {
-  padding: 8px 16px;
+  padding: var(--s-2) var(--s-4);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   gap: 10px;
@@ -215,13 +215,13 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--fg-3);
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-1);
 }
 
 .lm-tbl td {
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
   border-bottom: 1px solid var(--border-subtle);
   color: var(--fg-1);
   vertical-align: middle;
@@ -241,13 +241,13 @@
 .lm-tbl .waste-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .lm-tbl .project-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .lm-tbl .project-dot {

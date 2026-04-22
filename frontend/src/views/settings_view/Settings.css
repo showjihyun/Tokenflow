@@ -9,11 +9,11 @@
 .settings-input {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   background: var(--bg-2);
   border: 1px solid var(--border-default);
   border-radius: var(--r-sm);
-  padding: 8px 12px;
+  padding: var(--s-2) var(--s-3);
 }
 
 .settings-input input {
@@ -45,7 +45,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 10px;
+  padding: var(--s-2) 10px;
   background: var(--bg-2);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
@@ -53,12 +53,12 @@
 
 .settings-radio {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .settings-radio button {
   flex: 1;
-  padding: 10px 12px;
+  padding: 10px var(--s-3);
   background: var(--bg-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
@@ -67,7 +67,7 @@
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-1);
 }
 
 .settings-radio button.active {
@@ -93,5 +93,5 @@
   background: var(--bg-3);
   color: var(--fg-3);
   font-family: var(--font-mono);
-  margin-left: 8px;
+  margin-left: var(--s-2);
 }

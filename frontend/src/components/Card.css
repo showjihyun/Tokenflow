@@ -9,9 +9,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: var(--s-3) var(--s-4);
   border-bottom: 1px solid var(--border-subtle);
-  gap: 12px;
+  gap: var(--s-3);
 }
 
 .card-title {
@@ -24,7 +24,7 @@
   letter-spacing: 0.01em;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   flex: 1;
   min-width: 0;
 }
@@ -35,7 +35,7 @@
 }
 
 .card-body {
-  padding: 16px;
+  padding: var(--s-4);
 }
 
 .card-body.flush {
@@ -43,18 +43,18 @@
 }
 
 .app[data-density="compact"] .card-body {
-  padding: 12px;
+  padding: var(--s-3);
 }
 
 .app[data-density="roomy"] .card-body {
-  padding: 20px;
+  padding: var(--s-5);
 }
 
 /* Row helpers (page-level grid) */
 .row {
   display: grid;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
 }
 .row-2 {
   grid-template-columns: 2fr 1fr;
@@ -72,12 +72,12 @@
 .hstack {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .vstack {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .spread {
   display: flex;
@@ -87,7 +87,7 @@
 .hr {
   height: 1px;
   background: var(--border-subtle);
-  margin: 12px 0;
+  margin: var(--s-3) 0;
   border: 0;
 }
 

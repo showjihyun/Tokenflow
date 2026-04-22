@@ -99,8 +99,8 @@ textarea {
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 16px;
+  padding: 0 var(--s-5);
+  gap: var(--s-4);
   height: 48px;
 }
 
@@ -111,16 +111,16 @@ textarea {
 }
 
 .page {
-  padding: 20px 24px 48px;
+  padding: var(--s-5) var(--s-6) var(--s-12);
   max-width: 1600px;
   margin: 0 auto;
 }
 
 .app[data-density="compact"] .page {
-  padding: 12px 14px 32px;
+  padding: var(--s-3) 14px var(--s-8);
 }
 .app[data-density="roomy"] .page {
-  padding: 28px 32px 56px;
+  padding: 28px var(--s-8) 56px;
 }
 
 .page-header {
@@ -128,14 +128,14 @@ textarea {
   align-items: flex-end;
   justify-content: space-between;
   margin-bottom: 18px;
-  gap: 16px;
+  gap: var(--s-4);
 }
 
 .page-title {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  margin: 0 0 4px;
+  margin: 0 0 var(--s-1);
 }
 
 .page-sub {
