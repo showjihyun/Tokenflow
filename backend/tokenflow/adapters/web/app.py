@@ -19,6 +19,7 @@ from tokenflow.adapters.persistence import migrations, paths
 from tokenflow.adapters.persistence.repository import Repository
 from tokenflow.adapters.transcript.tailer import TranscriptTailer
 from tokenflow.adapters.web.blocking import run_blocking
+from tokenflow.adapters.web.middleware.request_id import RequestIdMiddleware
 from tokenflow.adapters.web.pubsub import EventBus
 from tokenflow.adapters.web.routes import api_router
 
@@ -69,8 +70,14 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
         allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["*", "Last-Event-ID"],
+        allow_headers=["*", "Last-Event-ID", "X-Request-ID"],
+        expose_headers=["X-Request-ID"],
     )
+    # Starlette runs middleware in LIFO order, so adding RequestID after CORS
+    # means it runs FIRST on the request path and LAST on the response — that
+    # way CORS preflights still carry the request_id we assign, and the echoed
+    # X-Request-ID header survives CORS header filtering.
+    app.add_middleware(RequestIdMiddleware)
 
     app.include_router(api_router)
 

@@ -42,6 +42,7 @@ def serve(
     dev: bool = typer.Option(False, "--dev", help="Dev mode - skip static mount, expect Vite on :5173."),
 ) -> None:
     from tokenflow.adapters.web.app import create_app
+    from tokenflow.lib.logging import build_log_config
 
     frontend_dist = None if dev else paths.frontend_dist_dir()
     app_instance = create_app(frontend_dist=frontend_dist)
@@ -54,7 +55,7 @@ def serve(
         console.print("[dim]run `npm run build` in ../frontend or reinstall the wheel.[/dim]")
     else:
         console.print(f"[dim]serving SPA from {frontend_dist}[/dim]")
-    uvicorn.run(app_instance, host=host, port=port, log_level="info")
+    uvicorn.run(app_instance, host=host, port=port, log_config=build_log_config(dev=dev))
 
 
 def _ensure_db_lock_ok() -> bool:

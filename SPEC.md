@@ -691,8 +691,10 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | API 키 파일 권한 0600 아님 | 파일 저장 시 best-effort chmod | 실패 시 저장은 유지하되 health/status 에서 점검 가능 |
 
 ### 10.5 관측성
-- 현재 구현: stdlib `logging` 기본 설정 (uvicorn stderr). 모듈별 `logging.getLogger(__name__)` 사용.
-- v1.1 계획: `~/.tokenflow/logs/` 로테이팅 핸들러(7일), JSON formatter, `TOKENFLOW_LOG_LEVEL` env, 요청 scope correlation ID (§12 tracking 참조)
+- **구조화 로깅**: `serve` 기본은 JSON lines on stderr (`{"ts","level","logger","msg","request_id", ...}`). `serve --dev` 는 사람이 읽기 좋은 `LEVEL NAME [request_id] message` 포맷. 둘 다 uvicorn access/error 로거까지 같은 handler 를 공유한다.
+- **Request correlation**: `RequestIdMiddleware` 가 요청마다 `X-Request-ID` 를 검증·발급한다. 클라이언트가 보낸 값은 `^[A-Za-z0-9._:\-]{1,64}$` 일 때만 echo; 제어문자(CR/LF/NUL 등)·길이 초과는 조용히 새 uuid4 hex 로 대체한다. **F2 — CRLF 헤더 인젝션 회귀 테스트 필수** (`tests/test_middleware_request_id.py`, 5 cases).
+- **로그 레벨**: 환경변수 `TOKENFLOW_LOG_LEVEL` (DEBUG/INFO/WARNING/ERROR/CRITICAL). 기본 INFO, 미지 값은 INFO 로 fallback + warning 1회.
+- 파일 rotation (`~/.tokenflow/logs/`, 7일) 은 §10.4 `migration_failed.log` 와 함께 v1.2 에서 다룸.
 
 ### 10.6 기타
 - I18n: 한국어/영어. 날짜·숫자는 사용자 lang 에 따라 `Intl` 포맷. TZ 는 브라우저 로컬.
@@ -749,7 +751,7 @@ Prefix `/api`. 인증 없음. 127.0.0.1 바인딩.
 | Query Quality Score | `/coach/query-quality` 정적 scoring API + Coach composer grade/signal UI 구현 | 완료. signal별 rewrite suggestion 은 추가 개선 |
 | Bell notification center | Topbar Bell 최근 10개 persisted in-app 알림, unread badge, dropdown open read-all, 개별 read, Clear all 구현 | 완료. persisted notification filter/search 는 추가 개선 |
 | System notifications | in-app/system preference, 브라우저 Notification 지원/권한 플로우, waste, SessionEnd, budget threshold, context saturation, Opus overuse, API error 이벤트 연결 | 완료. 더 세밀한 알림 빈도 제어는 추가 개선 |
-| 구조화 로깅 / 로그 로테이션 | stdlib `logging` 기본 설정 (stderr). `~/.tokenflow/logs/` 로테이팅 핸들러·JSON formatter·`TOKENFLOW_LOG_LEVEL`·request correlation ID 는 v1.1 작업 | SPEC 이 더 정확. `~/.tokenflow/logs/migration_failed.log` 를 언급하는 §10.4 와 연동해 v1.1 에서 동시 정비 |
+| 구조화 로깅 / 로그 로테이션 | JSON formatter · `TOKENFLOW_LOG_LEVEL` · `X-Request-ID` 미들웨어 (F2 CRLF 인젝션 방어 포함) 는 v1.2 에 구현 완료. `~/.tokenflow/logs/` 파일 rotation 은 §10.4 와 함께 후속 | §10.5 참조 |
 | Hard budget 한계 도달 알림 | `hard_block` 설정 컬럼은 존재하나 budget-threshold 이벤트를 SSE 로 발사하는 publisher 부재 (ticker 렌더 경로만 있음) | SPEC §11 #4 기준 "v1 알림" 약속 — publisher 누락 보완 필요 (v1.1) |
 
 ---
