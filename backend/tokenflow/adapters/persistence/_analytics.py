@@ -53,6 +53,7 @@ class _AnalyticsMixin(_BaseRepo):
                 "pct": waste_pct,
                 "delta": round(waste_pct - prev_waste_pct, 4),
                 "byKind": attribution["byKind"],
+                "series": self._waste_series(days=7),
             },
             "window": window,
         }
@@ -226,6 +227,37 @@ class _AnalyticsMixin(_BaseRepo):
             )
             out.append(max(0, min(100, round(100 - penalty))))
         return out
+
+    def _waste_series(self, *, days: int) -> list[int]:
+        """Per-day wasted-token totals over the trailing ``days`` window, oldest-first.
+
+        Backs the Live Monitor wasted-tokens sparkline with real data rather
+        than a cosmetic placeholder. Buckets on ``tf_waste_patterns.detected_at``
+        day-truncated; dismissed patterns excluded so the viz reflects active
+        waste. Days with zero waste return 0 — the caller renders a flat
+        baseline instead of a misleading trend.
+        """
+        now = datetime.now(tz=UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        start = now - timedelta(days=days - 1)
+        rows = self._q(
+            """
+            SELECT CAST(date_trunc('day', detected_at) AS DATE) AS d,
+                   COALESCE(SUM(save_tokens), 0) AS tokens
+            FROM tf_waste_patterns
+            WHERE detected_at >= ? AND detected_at < ?
+              AND dismissed_at IS NULL
+            GROUP BY d
+            """,
+            (start, now + timedelta(days=1)),
+        )
+        by_day = {
+            (r[0].isoformat() if hasattr(r[0], "isoformat") else str(r[0])): int(r[1] or 0)
+            for r in rows
+        }
+        return [
+            by_day.get((now - timedelta(days=offset)).date().isoformat(), 0)
+            for offset in range(days - 1, -1, -1)
+        ]
 
     def _sum_tokens_since(self, since: datetime) -> int:
         rows = self._q(

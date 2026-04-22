@@ -164,3 +164,132 @@ def test_transcript_tailer_reads_jsonl(tmp_path: Path) -> None:
     assert session is not None
     assert session["tokens"]["output"] == 800
     assert session["costUSD"] > 0
+
+
+def _drain_events(published: list[dict[str, object]], kind: str) -> list[dict[str, object]]:
+    return [e for e in published if e.get("kind") == kind]
+
+
+def test_tailer_publishes_opus_warn_at_fifteen_percent(tmp_path: Path) -> None:
+    """SPEC §11 #15 — Opus share in the warn band (15-25%) publishes severity='med'.
+
+    Seeds one Sonnet session (85% of today's cost) + one Opus session (15%).
+    The tailer's ``_publish_usage_notifications`` should fire a single
+    ``opus-overuse`` event with ``severity='med'``.
+    """
+    repo = _init_db()
+    published: list[dict[str, object]] = []
+    tailer = TranscriptTailer(repo, publish=published.append)
+    now = datetime.now(tz=UTC)
+
+    repo.upsert_session_started("s_sonnet", "p", "claude-sonnet-4-6", now)
+    repo.upsert_session_started("s_opus", "p", "claude-opus-4-7", now)
+    repo.insert_message(
+        "m_sonnet", "s_sonnet", now, "assistant", "claude-sonnet-4-6",
+        1000, 1000, 0, 0, 0.85, "s", False,
+    )
+    repo.insert_message(
+        "m_opus", "s_opus", now, "assistant", "claude-opus-4-7",
+        500, 500, 0, 0, 0.15, "o", False,
+    )
+
+    tailer._publish_usage_notifications("s_opus")
+    hits = _drain_events(published, "opus-overuse")
+    assert len(hits) == 1, f"expected one opus-overuse event, got {hits}"
+    assert hits[0]["severity"] == "med"
+    share = hits[0]["share"]
+    assert isinstance(share, (int, float)) and 0.14 <= float(share) <= 0.16
+
+
+def test_tailer_publishes_opus_alert_at_thirty_percent(tmp_path: Path) -> None:
+    """Opus share ≥25% triggers the alert band: severity='high'.
+
+    Shares above the warn threshold must emit ``severity='high'`` and dedup
+    per month-key so a single burst doesn't fire repeatedly on every poll
+    (same bucket → no second event on a repeat call).
+    """
+    repo = _init_db()
+    published: list[dict[str, object]] = []
+    tailer = TranscriptTailer(repo, publish=published.append)
+    now = datetime.now(tz=UTC)
+
+    repo.upsert_session_started("s_sonnet", "p", "claude-sonnet-4-6", now)
+    repo.upsert_session_started("s_opus", "p", "claude-opus-4-7", now)
+    repo.insert_message(
+        "m_sonnet", "s_sonnet", now, "assistant", "claude-sonnet-4-6",
+        1000, 1000, 0, 0, 0.70, "s", False,
+    )
+    repo.insert_message(
+        "m_opus", "s_opus", now, "assistant", "claude-opus-4-7",
+        1000, 1000, 0, 0, 0.30, "o", False,
+    )
+
+    tailer._publish_usage_notifications("s_opus")
+    hits = _drain_events(published, "opus-overuse")
+    assert len(hits) == 1
+    assert hits[0]["severity"] == "high"
+
+    # Second call in the same month+severity bucket must not re-fire.
+    tailer._publish_usage_notifications("s_opus")
+    assert len(_drain_events(published, "opus-overuse")) == 1
+
+
+def test_tailer_publishes_budget_exceeded_when_hard_block_and_over_budget(tmp_path: Path) -> None:
+    """SPEC §11 #4 — hard_block=true + spent≥budget emits a distinct
+    ``budget-exceeded`` event beside the threshold pings, so the UI can
+    render a red banner. No proxy blocking here; that's v2.
+    """
+    repo = _init_db()
+    published: list[dict[str, object]] = []
+    tailer = TranscriptTailer(repo, publish=published.append)
+    now = datetime.now(tz=UTC)
+
+    repo.patch_config(monthly_budget_usd=10.0, hard_block=True, alert_thresholds_pct="[50,75,90]")
+    repo.upsert_session_started("s_over", "p", "claude-opus-4-7", now)
+    # Spend $12 — 120% of the $10 monthly budget.
+    repo.insert_message(
+        "m_over", "s_over", now, "assistant", "claude-opus-4-7",
+        5000, 2000, 0, 0, 12.0, "o", False,
+    )
+
+    tailer._publish_usage_notifications("s_over")
+
+    exceeded = _drain_events(published, "budget-exceeded")
+    assert len(exceeded) == 1
+    assert exceeded[0]["hard_block"] is True
+    spent = exceeded[0]["spent"]
+    assert isinstance(spent, (int, float)) and float(spent) >= 10.0
+    # Threshold pings also fire alongside (50/75/90 all crossed at 120%).
+    thresholds = _drain_events(published, "budget-threshold")
+    thresh_pcts: set[int] = set()
+    for e in thresholds:
+        pct = e.get("threshold_pct")
+        if isinstance(pct, (int, float)):
+            thresh_pcts.add(int(pct))
+    assert thresh_pcts >= {50, 75, 90}
+
+    # Dedup: repeat call in the same month must not re-emit exceeded.
+    tailer._publish_usage_notifications("s_over")
+    assert len(_drain_events(published, "budget-exceeded")) == 1
+
+
+def test_tailer_skips_budget_exceeded_when_hard_block_false(tmp_path: Path) -> None:
+    """Over-budget without ``hard_block`` fires threshold pings only —
+    the red-banner ``budget-exceeded`` event is gated on the toggle.
+    """
+    repo = _init_db()
+    published: list[dict[str, object]] = []
+    tailer = TranscriptTailer(repo, publish=published.append)
+    now = datetime.now(tz=UTC)
+
+    repo.patch_config(monthly_budget_usd=10.0, hard_block=False, alert_thresholds_pct="[50,75,90]")
+    repo.upsert_session_started("s_soft", "p", "claude-sonnet-4-6", now)
+    repo.insert_message(
+        "m_soft", "s_soft", now, "assistant", "claude-sonnet-4-6",
+        1000, 1000, 0, 0, 12.0, "s", False,
+    )
+
+    tailer._publish_usage_notifications("s_soft")
+
+    assert _drain_events(published, "budget-exceeded") == []
+    assert _drain_events(published, "budget-threshold") != []
