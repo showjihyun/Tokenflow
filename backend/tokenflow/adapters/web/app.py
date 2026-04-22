@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -81,6 +81,13 @@ def create_app(frontend_dist: Path | None = None) -> FastAPI:
 
         @app.get("/{full_path:path}")
         async def spa_fallback(full_path: str) -> FileResponse:
+            # SPA routes (client-side) get index.html — React Router then
+            # picks the matching <Route>. API/doc/asset paths must never
+            # be rewritten to HTML: an unknown /api/* is a real 404, not
+            # a frontend view. The /assets/* mount above catches real
+            # asset 404s before we get here, but guard anyway.
+            if full_path.startswith(("api/", "api", "assets/", "docs", "openapi", "redoc")):
+                raise HTTPException(status_code=404, detail="Not found")
             return FileResponse(frontend_dist / "index.html")
 
     return app
