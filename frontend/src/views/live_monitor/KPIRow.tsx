@@ -94,10 +94,10 @@ export function KPIRow() {
         deltaDir={data.waste.delta >= 0 ? "up" : "down"}
         sub={wasteSub}
         accent="var(--red)"
-        // Only render the sparkline when there's real waste to show. A
-        // hardcoded descending series was being drawn even for waste=0,
-        // which read as a falling-trend alert on empty data.
-        spark={data.waste.tokens > 0 ? [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3] : undefined}
+        // Real trailing-7-day series from /kpi/summary. Empty or all-zero
+        // arrays are treated as "no data" — spark stays hidden rather than
+        // render a flat baseline that reads like a trend.
+        spark={data.waste.series && data.waste.series.some((v) => v > 0) ? data.waste.series : undefined}
         sparkColor="var(--red)"
       />
     </div>

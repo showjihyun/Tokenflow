@@ -30,6 +30,9 @@ export interface KPISummary {
     pct: number;
     delta: number;
     byKind?: { kind: string; findings: number; tokens: number; usd: number }[];
+    /** Trailing 7-day wasted-tokens series, oldest → newest. Feeds the
+        Live Monitor wasted-tokens sparkline with real data. */
+    series?: number[];
   };
   window: string;
 }

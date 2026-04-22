@@ -98,6 +98,12 @@
   align-items: flex-end;
   gap: 3px;
   height: 56px;
+  /* Long sessions (50+ messages at 12px + 3px gap = >750px) would blow out the
+     panel. Horizontal scroll keeps the bars visible; vertical is clipped so
+     a tall bar never pushes neighbors down. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .replay-scrub-bar {
